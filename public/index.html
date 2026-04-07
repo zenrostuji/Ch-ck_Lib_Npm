@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NPM Library Reporter</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%236c63ff'/><stop offset='100%25' stop-color='%23ff6584'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='url(%23g)'/><path d='M50 20L26 34v28l24 14 24-14V34z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/><path d='M26 34l24 14 24-14M50 48v20' fill='none' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>" />
+<style>
+  /* ── Dark Theme (default) ── */
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface2: #242740;
+    --border: #2e3250;
+    --accent: #6c63ff;
+    --accent2: #ff6584;
+    --green: #43d98c;
+    --yellow: #ffd166;
+    --red: #ef4565;
+    --blue: #4cc9f0;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --radius: 12px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --header-bg: linear-gradient(135deg, #1a1d2e 0%, #242740 100%);
+    --overlay-bg: rgba(0,0,0,.6);
+    --modal-shadow: 0 20px 60px rgba(0,0,0,.6);
+    --skeleton-mid: #2e3250;
+    --hover-row: rgba(108,99,255,.07);
+  }
+
+  /* ── Light Theme ── */
+  html.light {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --surface2: #eef1f6;
+    --border: #d4d9e3;
+    --accent: #5b52e6;
+    --accent2: #e84c6f;
+    --green: #22a86a;
+    --yellow: #d4a017;
+    --red: #d93651;
+    --blue: #1a9fc7;
+    --text: #1e293b;
+    --text2: #475569;
+    --text3: #94a3b8;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --header-bg: linear-gradient(135deg, #ffffff 0%, #f0f2f7 100%);
+    --overlay-bg: rgba(0,0,0,.35);
+    --modal-shadow: 0 20px 60px rgba(0,0,0,.18);
+    --skeleton-mid: #dde1ea;
+    --hover-row: rgba(91,82,230,.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    font-size: 14px;
+    transition: background .3s, color .3s;
+  }
+
+  /* ── SVG Icon base ── */
+  .icon-svg { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icon-svg svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── Header ── */
+  header {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--shadow);
+    transition: background .3s, border-color .3s, box-shadow .3s;
+  }
+  .header-inner {
+    max-width: 1600px; margin: 0 auto;
+    display: flex; align-items: center; gap: 16px;
+    height: 64px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 18px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .project-badge {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 14px;
+    font-size: 12px; color: var(--text2);
+    display: flex; align-items: center; gap: 6px;
+    max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    transition: background .3s, border-color .3s;
+  }
+  .project-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .spacer { flex: 1; }
+  .btn {
+    padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; transition: all .2s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #5851e6; transform: translateY(-1px); }
+  .btn-outline {
+    background: transparent; color: var(--text2);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+  /* ── Theme toggle btn ── */
+  .theme-toggle {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text2); transition: all .2s;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle .icon-sun { display: none; }
+  .theme-toggle .icon-moon { display: flex; }
+  html.light .theme-toggle .icon-sun { display: flex; }
+  html.light .theme-toggle .icon-moon { display: none; }
+
+  /* ── Layout ── */
+  .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+
+  /* ── Project Path Input ── */
+  .path-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+    flex-wrap: wrap;
+    transition: background .3s, border-color .3s;
+  }
+  .path-bar label { color: var(--text2); font-size: 13px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+  .path-input {
+    flex: 1; min-width: 280px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+    color: var(--text); font-size: 13px; font-family: 'Consolas', monospace;
+    transition: border-color .2s, background .3s, color .3s;
+  }
+  .path-input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Stats Cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color .2s, transform .2s, background .3s;
+  }
+  .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+  .stat-value { font-size: 28px; font-weight: 700; }
+  .stat-value.c-accent { color: var(--accent); }
+  .stat-value.c-green { color: var(--green); }
+  .stat-value.c-yellow { color: var(--yellow); }
+  .stat-value.c-blue { color: var(--blue); }
+  .stat-value.c-red { color: var(--red); }
+  .stat-sub { font-size: 11px; color: var(--text3); }
+
+  /* ── Progress ── */
+  .progress-wrap { margin-bottom: 24px; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text2); }
+  .progress-bar-bg { background: var(--surface2); border-radius: 99px; height: 8px; overflow: hidden; }
+  .progress-bar-fill {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%; transition: width .4s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ── Filters / Toolbar ── */
+  .toolbar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px; flex-wrap: wrap;
+    transition: background .3s, border-color .3s;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px 8px 36px;
+    color: var(--text); font-size: 13px; transition: border-color .2s, background .3s, color .3s;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .search-icon {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text3); pointer-events: none;
+  }
+  .filter-tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text2); cursor: pointer;
+    font-size: 12px; font-weight: 600; transition: all .15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .sort-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 7px 12px;
+    font-size: 13px; cursor: pointer;
+    transition: background .3s, color .3s, border-color .3s;
+  }
+  .sort-select:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); transition: border-color .3s; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--surface2); padding: 12px 16px;
+    text-align: left; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--text3);
+    position: sticky; top: 0; cursor: pointer; user-select: none;
+    white-space: nowrap;
+    transition: background .3s;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .sort-arrow { margin-left: 4px; opacity: .5; }
+  thead th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+  tbody tr {
+    border-top: 1px solid var(--border);
+    transition: background .15s;
+  }
+  tbody tr:hover { background: var(--hover-row); }
+  tbody td { padding: 12px 16px; vertical-align: top; }
+  td.name-cell { min-width: 200px; }
+  .pkg-name {
+    font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .pkg-name a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  .pkg-name a:hover { text-decoration: underline; }
+  .dep-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0;
+  }
+  .dep-badge.dep { background: rgba(108,99,255,.2); color: var(--accent); border: 1px solid rgba(108,99,255,.4); }
+  .dep-badge.dev { background: rgba(76,201,240,.15); color: var(--blue); border: 1px solid rgba(76,201,240,.35); }
+  .dep-badge.peer { background: rgba(255,209,102,.15); color: var(--yellow); border: 1px solid rgba(255,209,102,.35); }
+  .pkg-desc { font-size: 12px; color: var(--text3); margin-top: 3px; line-height: 1.4; max-width: 300px; }
+  .version-cell { min-width: 130px; }
+  .ver-req { font-size: 12px; color: var(--text3); font-family: 'Consolas', monospace; }
+  .ver-latest { font-size: 13px; font-weight: 600; color: var(--green); font-family: 'Consolas', monospace; }
+  .date-cell { min-width: 130px; white-space: nowrap; }
+  .date-val { font-size: 13px; color: var(--text); }
+  .date-ago { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .deps-cell { min-width: 180px; }
+  .deps-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    font-size: 11px; padding: 2px 8px; border-radius: 99px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); cursor: pointer; transition: all .15s;
+    font-family: 'Consolas', monospace;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(108,99,255,.1); }
+  .chip-more { color: var(--text3); }
+  .downloads-cell { min-width: 110px; text-align: right; white-space: nowrap; }
+  .dl-num { font-size: 13px; font-weight: 700; }
+  .dl-num.high { color: var(--green); }
+  .dl-num.med { color: var(--yellow); }
+  .dl-num.low { color: var(--text3); }
+  .actions-cell { min-width: 90px; text-align: center; }
+  .btn-sm {
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text2); cursor: pointer;
+    font-size: 11px; transition: all .15s;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  .error-row td { color: var(--red); }
+
+  /* ── Loading skeleton ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--skeleton-mid) 50%, var(--surface2) 75%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 4px; height: 14px; display: inline-block;
+  }
+  @keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+
+  /* ── Modal ── */
+  .overlay {
+    position: fixed; inset: 0; background: var(--overlay-bg);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px; backdrop-filter: blur(4px);
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px;
+    max-width: 700px; width: 100%; max-height: 85vh; overflow-y: auto;
+    box-shadow: var(--modal-shadow);
+    transition: background .3s, border-color .3s;
+  }
+  .modal-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 12px; }
+  .modal-title { font-size: 20px; font-weight: 700; }
+  .modal-close {
+    background: none; border: none; color: var(--text3); cursor: pointer;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; transition: all .15s;
+  }
+  .modal-close:hover { color: var(--text); background: var(--surface2); }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  @media(max-width:560px){ .detail-grid { grid-template-columns: 1fr; } }
+  .detail-field label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 4px; }
+  .detail-field .val { font-size: 14px; color: var(--text); word-break: break-all; }
+  .detail-field .val a { color: var(--accent); }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--text2); margin: 0 0 10px; letter-spacing: .04em; text-transform: uppercase; }
+  .deps-section { margin-bottom: 16px; }
+  .kw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .kw-chip { padding: 3px 10px; border-radius: 4px; background: var(--surface2); border: 1px solid var(--border); font-size: 12px; color: var(--text2); }
+
+  /* ── Empty / Error state ── */
+  .empty-state {
+    text-align: center; padding: 60px 24px;
+    color: var(--text3);
+  }
+  .empty-state .empty-icon { margin-bottom: 16px; color: var(--text3); }
+  .empty-state h3 { font-size: 18px; color: var(--text2); margin-bottom: 8px; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 18px;
+    font-size: 13px; color: var(--text);
+    box-shadow: var(--shadow); z-index: 2000;
+    transform: translateY(80px); opacity: 0;
+    transition: all .3s cubic-bezier(.4,0,.2,1);
+    max-width: 380px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--green); }
+  #toast.error { border-color: var(--red); }
+
+  /* ── Responsive ── */
+  @media(max-width:900px){
+    .detail-grid { grid-template-columns: 1fr; }
+    tbody td { padding: 8px 10px; }
+  }
+
+  /* ── Chart area ── */
+  .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: background .3s, border-color .3s;
+  }
+  .chart-card h3 { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 16px; }
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label { font-size: 12px; color: var(--text2); width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .6s; }
+  .bar-count { font-size: 11px; color: var(--text3); min-width: 28px; text-align: right; }
+  .pie-legend { display: flex; flex-wrap: wrap; gap: 12px; }
+  .pie-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .pie-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── CVE / Security badges ── */
+  .cve-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .04em; display: inline-flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+  .cve-badge.critical { background: rgba(239,69,101,.2); color: var(--red); border: 1px solid rgba(239,69,101,.5); }
+  .cve-badge.high { background: rgba(255,140,50,.2); color: #ff8c32; border: 1px solid rgba(255,140,50,.45); }
+  .cve-badge.medium { background: rgba(255,209,102,.18); color: var(--yellow); border: 1px solid rgba(255,209,102,.4); }
+  .cve-badge.low { background: rgba(76,201,240,.12); color: var(--blue); border: 1px solid rgba(76,201,240,.3); }
+  .cve-badge.safe { background: rgba(67,217,140,.12); color: var(--green); border: 1px solid rgba(67,217,140,.3); }
+  .cve-badge.unknown { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+  .security-cell { min-width: 100px; }
+  .vuln-list { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .vuln-item {
+    background: var(--surface2); border-radius: 10px; padding: 14px;
+    border-left: 4px solid var(--border);
+  }
+  .vuln-item.severity-critical { border-left-color: var(--red); }
+  .vuln-item.severity-high { border-left-color: #ff8c32; }
+  .vuln-item.severity-medium { border-left-color: var(--yellow); }
+  .vuln-item.severity-low { border-left-color: var(--blue); }
+  .vuln-item .vuln-id { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .vuln-item .vuln-id a { color: var(--accent); text-decoration: none; }
+  .vuln-item .vuln-id a:hover { text-decoration: underline; }
+  .vuln-item .vuln-summary { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 6px; }
+  .vuln-item .vuln-meta { font-size: 11px; color: var(--text3); display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* ── Usage badges ── */
+  .usage-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    text-transform: uppercase; letter-spacing: .04em; display: inline-flex; align-items: center; gap: 4px;
+    white-space: nowrap;
+  }
+  .usage-badge.used { background: rgba(67,217,140,.12); color: var(--green); border: 1px solid rgba(67,217,140,.3); }
+  .usage-badge.unused { background: rgba(239,69,101,.15); color: var(--red); border: 1px solid rgba(239,69,101,.35); }
+  .usage-cell { min-width: 100px; }
+  .usage-files { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .usage-file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .usage-file-item {
+    font-size: 12px; font-family: 'Consolas', monospace;
+    color: var(--text2); padding: 4px 8px; border-radius: 4px;
+    background: var(--surface2);
+  }
+  .usage-statement { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  /* ── Dependency Tree ── */
+  .dep-tree { margin-top: 10px; font-size: 13px; }
+  .tree-node { position: relative; padding-left: 20px; margin-bottom: 4px; }
+  .tree-node::before {
+    content: ''; position: absolute; left: 6px; top: 0; bottom: 8px;
+    border-left: 1px dashed var(--border);
+  }
+  .tree-node:last-child::before { bottom: calc(100% - 12px); }
+  .tree-node-label {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px;
+    border-radius: 6px; cursor: pointer; transition: background .15s;
+  }
+  .tree-node-label:hover { background: var(--hover-row); }
+  .tree-node-label .tn-name { font-weight: 600; color: var(--text); }
+  .tree-node-label .tn-ver { font-size: 11px; color: var(--text3); font-family: 'Consolas', monospace; }
+  .tree-node-children { padding-left: 16px; }
+  .tree-toggle { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text3); transition: transform .2s; flex-shrink: 0;
+  }
+  .tree-toggle.collapsed { transform: rotate(-90deg); }
+  .tree-loading { color: var(--text3); font-size: 12px; padding: 8px 0; display: flex; align-items: center; gap: 8px; }
+  .tree-vuln-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tree-vuln-dot.safe { background: var(--green); }
+  .tree-vuln-dot.warn { background: var(--yellow); }
+  .tree-vuln-dot.danger { background: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <span>NPM Library Reporter</span>
+    </div>
+    <div class="project-badge" id="projectBadge">
+      <span class="dot" id="statusDot"></span>
+      <span id="projectName">Đang tải...</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Chuyển giao diện sáng / tối">
+      <span class="icon-moon icon-svg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </span>
+      <span class="icon-sun icon-svg">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </span>
+    </button>
+    <button class="btn btn-outline" onclick="exportCSV()" id="btnExport" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+    <button class="btn btn-primary" onclick="startAnalyze()" id="btnAnalyze">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Phân tích
+    </button>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="container">
+
+  <!-- Path Bar -->
+  <div class="path-bar">
+    <label>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Project path:
+    </label>
+    <input type="text" class="path-input" id="pathInput" placeholder="D:\my-project hoặc /home/user/my-project" />
+    <button class="btn btn-outline" onclick="changeProject()">Đổi project</button>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+      <div class="stat-label">Tổng thư viện</div>
+      <div class="stat-value c-accent" id="statTotal">—</div>
+      <div class="stat-sub">dependencies + dev + peer</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Dependencies</div>
+      <div class="stat-value c-green" id="statDeps">—</div>
+      <div class="stat-sub">production</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Dev dependencies</div>
+      <div class="stat-value c-blue" id="statDevDeps">—</div>
+      <div class="stat-sub">development only</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Peer dependencies</div>
+      <div class="stat-value c-yellow" id="statPeerDeps">—</div>
+      <div class="stat-sub">peer requirements</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tổng sub-deps</div>
+      <div class="stat-value c-accent" id="statSubDeps">—</div>
+      <div class="stat-sub">thư viện con</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Lỗi fetch</div>
+      <div class="stat-value c-red" id="statErrors">—</div>
+      <div class="stat-sub">không lấy được thông tin</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Lỗ hổng bảo mật</div>
+      <div class="stat-value c-red" id="statVulns">—</div>
+      <div class="stat-sub" id="statVulnsSub">CVE / vulnerabilities</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Package có CVE</div>
+      <div class="stat-value c-yellow" id="statAffected">—</div>
+      <div class="stat-sub">bị ảnh hưởng</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Không sử dụng</div>
+      <div class="stat-value c-red" id="statUnused">—</div>
+      <div class="stat-sub">khai báo nhưng không import</div>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap" style="display:none">
+    <div class="progress-header">
+      <span id="progressLabel">Đang phân tích...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" id="chartsRow" style="display:none">
+    <div class="chart-card">
+      <h3>Top thư viện nhiều sub-deps nhất</h3>
+      <div class="bar-chart" id="chartTopDeps"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Phân bố loại dependency</h3>
+      <div id="chartPie" style="display:flex;flex-direction:column;gap:12px;"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top lượt tải tuần (weekly downloads)</h3>
+      <div class="bar-chart" id="chartTopDownloads"></div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon icon-svg">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Tìm tên thư viện, mô tả..." oninput="renderTable()" />
+    </div>
+    <div class="filter-tabs">
+      <button class="tab active" onclick="setFilter('all', this)">Tất cả</button>
+      <button class="tab" onclick="setFilter('dependencies', this)">Deps</button>
+      <button class="tab" onclick="setFilter('devDependencies', this)">Dev</button>
+      <button class="tab" onclick="setFilter('peerDependencies', this)">Peer</button>
+    </div>
+    <select class="sort-select" id="sortSelect" onchange="renderTable()">
+      <option value="name-asc">Tên A→Z</option>
+      <option value="name-desc">Tên Z→A</option>
+      <option value="created-desc">Mới phát hành trước</option>
+      <option value="created-asc">Cũ phát hành trước</option>
+      <option value="modified-desc">Mới cập nhật trước</option>
+      <option value="modified-asc">Cũ cập nhật trước</option>
+      <option value="deps-desc">Nhiều sub-deps trước</option>
+      <option value="downloads-desc">Downloads cao trước</option>
+      <option value="vulns-desc">Nhiều CVE trước</option>
+      <option value="unused-first">Chưa sử dụng trước</option>
+    </select>
+    <span id="countLabel" style="font-size:12px;color:var(--text3);white-space:nowrap;"></span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table id="pkgTable">
+      <thead>
+        <tr>
+          <th onclick="sortBy('name')">Thư viện <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('version')">Phiên bản <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('security')">Bảo mật <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('usage')">Sử dụng <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('created')">Ngày phát hành <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('modified')">Cập nhật gần nhất <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('deps')">Thư viện con (deps) <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('downloads')">Downloads/tuần <span class="sort-arrow">↕</span></th>
+          <th>Chi tiết</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="9">
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              </div>
+              <h3>Chưa có dữ liệu</h3>
+              <p>Nhấn <strong>Phân tích</strong> để bắt đầu quét thư viện trong project</p>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Modal chi tiết -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle"></div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px;" id="modalVersion"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ─── SVG Icon Strings (reusable in JS) ───────────────────────────────────────
+const SVG = {
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  xCircle: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+  search: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  loader: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>',
+  package: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+  searchBig: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+  barChart: '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+  shield: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  shieldOff: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"/><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+  fileCode: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  gitBranch: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
+  chevronDown: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+};
+
+// Inject spin keyframe for loader
+const styleEl = document.createElement('style');
+styleEl.textContent = '@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+document.head.appendChild(styleEl);
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let allPackages = [];
+let cveData = {};     // name -> { totalVulns, vulns, hasCritical, hasHigh }
+let usageData = {};   // name -> { isUsed, fileCount, files, statements }
+let filterType = 'all';
+let sortKey = 'name-asc';
+let analyzedAt = null;
+
+// ─── Theme ────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('light');
+  localStorage.setItem('npm-reporter-theme', isLight ? 'light' : 'dark');
+}
+(function loadTheme() {
+  if (localStorage.getItem('npm-reporter-theme') === 'light') {
+    document.documentElement.classList.add('light');
+  }
+})();
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch('/api/project-info');
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('projectName').textContent = data.name + ' v' + data.version;
+      document.getElementById('pathInput').value = data.projectPath;
+      updateStatsCards(data.totalDeps, data.totalDevDeps, data.totalPeerDeps);
+    }
+  } catch(e) {
+    document.getElementById('projectName').textContent = 'Lỗi kết nối';
+  }
+}
+
+function updateStatsCards(deps, dev, peer) {
+  const total = (deps||0) + (dev||0) + (peer||0);
+  document.getElementById('statTotal').textContent = total || '—';
+  document.getElementById('statDeps').textContent = deps || '—';
+  document.getElementById('statDevDeps').textContent = dev || '—';
+  document.getElementById('statPeerDeps').textContent = peer || '—';
+}
+
+// ─── Analyze ──────────────────────────────────────────────────────────────────
+async function startAnalyze() {
+  const btn = document.getElementById('btnAnalyze');
+  btn.disabled = true;
+  btn.innerHTML = SVG.loader + ' Đang phân tích...';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('chartsRow').style.display = 'none';
+  setProgress(0, 'Đang tải danh sách thư viện...');
+
+  try {
+    const listRes = await fetch('/api/packages-list');
+    const listData = await listRes.json();
+    if (!listData.success) throw new Error(listData.error);
+    const total = listData.packages.length;
+    setProgress(5, 'Phân tích ' + total + ' thư viện...');
+
+    const analyzeRes = await fetch('/api/analyze');
+    setProgress(90, 'Đang xử lý kết quả...');
+    const analyzeData = await analyzeRes.json();
+    if (!analyzeData.success) throw new Error(analyzeData.error);
+
+    allPackages = analyzeData.packages;
+    analyzedAt = analyzeData.analyzedAt;
+
+    setProgress(92, 'Đang kiểm tra bảo mật CVE...');
+    try {
+      const cveRes = await fetch('/api/cve-all');
+      const cveAll = await cveRes.json();
+      if (cveAll.success) {
+        cveData = {};
+        (cveAll.packages || []).forEach(c => { cveData[c.name] = c; });
+      }
+    } catch(e) { console.warn('CVE fetch failed:', e); }
+
+    setProgress(96, 'Đang quét mức độ sử dụng...');
+    try {
+      const usageRes = await fetch('/api/usage');
+      const usageAll = await usageRes.json();
+      if (usageAll.success) {
+        usageData = {};
+        (usageAll.packages || []).forEach(u => { usageData[u.name] = u; });
+      }
+    } catch(e) { console.warn('Usage fetch failed:', e); }
+
+    setProgress(100, 'Hoàn thành!');
+    setTimeout(() => { document.getElementById('progressWrap').style.display = 'none'; }, 800);
+
+    updateAfterAnalyze();
+    showToast('Đã phân tích ' + allPackages.length + ' thư viện', 'success');
+  } catch(e) {
+    showToast('Lỗi: ' + e.message, 'error');
+    document.getElementById('progressWrap').style.display = 'none';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = SVG.search + ' Phân tích';
+    document.getElementById('btnExport').disabled = allPackages.length === 0;
+  }
+}
+
+function updateAfterAnalyze() {
+  const deps = allPackages.filter(p => p.depType === 'dependencies').length;
+  const dev = allPackages.filter(p => p.depType === 'devDependencies').length;
+  const peer = allPackages.filter(p => p.depType === 'peerDependencies').length;
+  const totalSubDeps = allPackages.reduce((a, p) => a + p.dependencies.length, 0);
+  const errors = allPackages.filter(p => p.error).length;
+
+  document.getElementById('statTotal').textContent = allPackages.length;
+  document.getElementById('statDeps').textContent = deps;
+  document.getElementById('statDevDeps').textContent = dev;
+  document.getElementById('statPeerDeps').textContent = peer;
+  document.getElementById('statSubDeps').textContent = totalSubDeps;
+  document.getElementById('statErrors').textContent = errors;
+
+  // Security stats
+  let totalVulns = 0, affectedPkgs = 0;
+  for (const name of Object.keys(cveData)) {
+    const c = cveData[name];
+    if (c.totalVulns > 0) { affectedPkgs++; totalVulns += c.totalVulns; }
+  }
+  document.getElementById('statVulns').textContent = totalVulns || '0';
+  document.getElementById('statVulnsSub').textContent = totalVulns > 0 ? 'CVE / vulnerabilities' : 'Không phát hiện CVE';
+  document.getElementById('statAffected').textContent = affectedPkgs || '0';
+
+  // Usage stats
+  let unusedCount = 0;
+  for (const name of Object.keys(usageData)) {
+    if (!usageData[name].isUsed) unusedCount++;
+  }
+  document.getElementById('statUnused').textContent = unusedCount || '0';
+
+  renderCharts();
+  renderTable();
+}
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
+function renderCharts() {
+  document.getElementById('chartsRow').style.display = 'grid';
+
+  const sorted = [...allPackages].sort((a,b) => b.dependencies.length - a.dependencies.length).slice(0,8);
+  const maxDeps = sorted[0]?.dependencies.length || 1;
+  document.getElementById('chartTopDeps').innerHTML = sorted.map(p => `
+    <div class="bar-row">
+      <span class="bar-label" title="${p.name}">${p.name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(p.dependencies.length/maxDeps*100).toFixed(1)}%"></div></div>
+      <span class="bar-count">${p.dependencies.length}</span>
+    </div>
+  `).join('');
+
+  const deps = allPackages.filter(p=>p.depType==='dependencies').length;
+  const dev = allPackages.filter(p=>p.depType==='devDependencies').length;
+  const peer = allPackages.filter(p=>p.depType==='peerDependencies').length;
+  const total = allPackages.length || 1;
+  document.getElementById('chartPie').innerHTML = `
+    <div class="pie-legend">
+      <div class="pie-item"><div class="pie-dot" style="background:var(--accent)"></div><span>Dependencies: <strong>${deps}</strong> (${(deps/total*100).toFixed(0)}%)</span></div>
+      <div class="pie-item"><div class="pie-dot" style="background:var(--blue)"></div><span>Dev: <strong>${dev}</strong> (${(dev/total*100).toFixed(0)}%)</span></div>
+      <div class="pie-item"><div class="pie-dot" style="background:var(--yellow)"></div><span>Peer: <strong>${peer}</strong> (${(peer/total*100).toFixed(0)}%)</span></div>
+    </div>
+    <div style="margin-top:12px;background:var(--surface2);border-radius:8px;overflow:hidden;height:20px;display:flex;">
+      <div style="flex:${deps};background:var(--accent);transition:flex .6s;"></div>
+      <div style="flex:${dev};background:var(--blue);transition:flex .6s;"></div>
+      <div style="flex:${peer};background:var(--yellow);transition:flex .6s;"></div>
+    </div>
+  `;
+
+  const byDl = [...allPackages].filter(p=>p.weeklyDownloads).sort((a,b)=>b.weeklyDownloads-a.weeklyDownloads).slice(0,8);
+  const maxDl = byDl[0]?.weeklyDownloads || 1;
+  document.getElementById('chartTopDownloads').innerHTML = byDl.length ? byDl.map(p => `
+    <div class="bar-row">
+      <span class="bar-label" title="${p.name}">${p.name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(p.weeklyDownloads/maxDl*100).toFixed(1)}%;background:linear-gradient(90deg,var(--green),var(--blue))"></div></div>
+      <span class="bar-count">${fmtNum(p.weeklyDownloads)}</span>
+    </div>
+  `).join('') : '<div style="color:var(--text3);font-size:13px;">Không có dữ liệu downloads</div>';
+}
+
+// ─── Table ────────────────────────────────────────────────────────────────────
+function renderTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const sortVal = document.getElementById('sortSelect').value;
+
+  let filtered = allPackages.filter(p => {
+    if (filterType !== 'all' && p.depType !== filterType) return false;
+    if (q && !p.name.toLowerCase().includes(q) && !p.description.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    switch(sortVal) {
+      case 'name-asc': return a.name.localeCompare(b.name);
+      case 'name-desc': return b.name.localeCompare(a.name);
+      case 'created-desc': return compareDates(b.created, a.created);
+      case 'created-asc': return compareDates(a.created, b.created);
+      case 'modified-desc': return compareDates(b.latestPublished || b.modified, a.latestPublished || a.modified);
+      case 'modified-asc': return compareDates(a.latestPublished || a.modified, b.latestPublished || b.modified);
+      case 'deps-desc': return b.dependencies.length - a.dependencies.length;
+      case 'downloads-desc': return (b.weeklyDownloads||0) - (a.weeklyDownloads||0);
+      case 'vulns-desc': return ((cveData[b.name]?.totalVulns)||0) - ((cveData[a.name]?.totalVulns)||0);
+      case 'unused-first': return (usageData[a.name]?.isUsed?1:0) - (usageData[b.name]?.isUsed?1:0);
+      default: return 0;
+    }
+  });
+
+  document.getElementById('countLabel').textContent =
+    filtered.length === allPackages.length
+      ? filtered.length + ' thư viện'
+      : filtered.length + ' / ' + allPackages.length + ' thư viện';
+
+  const tbody = document.getElementById('tableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">' + SVG.searchBig + '</div><h3>Không tìm thấy</h3><p>Thử tìm với từ khóa khác</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(p => renderRow(p)).join('');
+}
+
+function renderRow(p) {
+  const typeClass = p.depType === 'dependencies' ? 'dep' : p.depType === 'devDependencies' ? 'dev' : 'peer';
+  const typeLabel = p.depType === 'dependencies' ? 'dep' : p.depType === 'devDependencies' ? 'dev' : 'peer';
+
+  const subDeps = p.dependencies.slice(0,5).map(d =>
+    '<span class="chip" onclick="openPackageModal(\'' + escHtml(d) + '\')" title="Xem ' + d + '">' + escHtml(d) + '</span>'
+  ).join('');
+  const moreCount = p.dependencies.length - 5;
+
+  const allSubDeps = [...p.dependencies, ...p.devDependencies, ...p.peerDependencies];
+  const dlClass = p.weeklyDownloads > 1000000 ? 'high' : p.weeklyDownloads > 50000 ? 'med' : 'low';
+
+  // Security column
+  const cve = cveData[p.name];
+  let securityHtml = '';
+  if (cve && cve.totalVulns > 0) {
+    const sevClass = cve.hasCritical ? 'critical' : cve.hasHigh ? 'high' : 'medium';
+    securityHtml = '<span class="cve-badge ' + sevClass + '">' + SVG.shieldOff + ' ' + cve.totalVulns + ' CVE</span>';
+  } else if (cve) {
+    securityHtml = '<span class="cve-badge safe">' + SVG.shield + ' An toàn</span>';
+  } else {
+    securityHtml = '<span class="cve-badge unknown">—</span>';
+  }
+
+  // Usage column
+  const usage = usageData[p.name];
+  let usageHtml = '';
+  if (usage && usage.isUsed) {
+    usageHtml = '<span class="usage-badge used">' + SVG.check + ' Đang dùng</span>' +
+      '<div class="usage-files">' + usage.fileCount + ' file' + (usage.fileCount > 1 ? 's' : '') + '</div>';
+  } else if (usage) {
+    usageHtml = '<span class="usage-badge unused">' + SVG.xCircle + ' Không dùng</span>';
+  } else {
+    usageHtml = '<span style="color:var(--text3);font-size:12px;">—</span>';
+  }
+
+  return '<tr class="' + (p.error ? 'error-row' : '') + '">' +
+    '<td class="name-cell">' +
+      '<div class="pkg-name">' +
+        '<a href="' + p.npmUrl + '" target="_blank" rel="noopener" title="Mở npm page">' + escHtml(p.name) + '</a>' +
+        '<span class="dep-badge ' + typeClass + '">' + typeLabel + '</span>' +
+      '</div>' +
+      (p.description ? '<div class="pkg-desc" title="' + escHtml(p.description) + '">' + escHtml(p.description.slice(0,100)) + (p.description.length>100?'…':'') + '</div>' : '') +
+    '</td>' +
+    '<td class="version-cell">' +
+      '<div class="ver-req" title="Yêu cầu">' + escHtml(p.requiredVersion||'') + '</div>' +
+      '<div class="ver-latest" title="Phiên bản mới nhất">v' + escHtml(p.latestVersion||'?') + '</div>' +
+      (p.license ? '<div style="font-size:11px;color:var(--text3);margin-top:2px;">' + escHtml(p.license) + '</div>' : '') +
+    '</td>' +
+    '<td class="security-cell">' + securityHtml + '</td>' +
+    '<td class="usage-cell">' + usageHtml + '</td>' +
+    '<td class="date-cell">' +
+      '<div class="date-val">' + fmtDate(p.created) + '</div>' +
+      '<div class="date-ago">' + timeAgo(p.created) + '</div>' +
+    '</td>' +
+    '<td class="date-cell">' +
+      '<div class="date-val">' + fmtDate(p.latestPublished || p.modified) + '</div>' +
+      '<div class="date-ago">' + timeAgo(p.latestPublished || p.modified) + '</div>' +
+    '</td>' +
+    '<td class="deps-cell">' +
+      '<div class="deps-chips">' +
+        subDeps +
+        (moreCount > 0 ? '<span class="chip chip-more" onclick="openDetailModal(\'' + escHtml(p.name) + '\')">+' + moreCount + ' nữa</span>' : '') +
+        (allSubDeps.length === 0 ? '<span style="color:var(--text3);font-size:12px;">Không có</span>' : '') +
+      '</div>' +
+      (allSubDeps.length > 0 ? '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' + p.dependencies.length + ' deps, ' + p.devDependencies.length + ' dev, ' + p.peerDependencies.length + ' peer</div>' : '') +
+    '</td>' +
+    '<td class="downloads-cell">' +
+      '<div class="dl-num ' + dlClass + '">' + (p.weeklyDownloads != null ? fmtNum(p.weeklyDownloads) : '—') + '</div>' +
+      (p.weeklyDownloads != null ? '<div style="font-size:10px;color:var(--text3)">/ tuần</div>' : '') +
+    '</td>' +
+    '<td class="actions-cell">' +
+      '<button class="btn-sm" onclick="openDetailModal(\'' + escHtml(p.name) + '\')">Chi tiết</button>' +
+    '</td>' +
+  '</tr>';
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openDetailModal(name) {
+  const p = allPackages.find(x => x.name === name);
+  if (!p) return openPackageModal(name);
+
+  document.getElementById('modalTitle').textContent = p.name;
+  document.getElementById('modalVersion').textContent = 'v' + p.latestVersion + ' · ' + (p.license||'No license') + ' · ' + p.totalVersions + ' phiên bản';
+  document.getElementById('modalBody').innerHTML = buildModalContent(p);
+  document.getElementById('overlay').classList.add('open');
+}
+
+async function openPackageModal(name) {
+  document.getElementById('modalTitle').textContent = name;
+  document.getElementById('modalVersion').textContent = 'Đang tải...';
+  document.getElementById('modalBody').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);">' + SVG.loader + ' Đang tải thông tin...</div>';
+  document.getElementById('overlay').classList.add('open');
+
+  const res = await fetch('/api/package/' + encodeURIComponent(name));
+  const data = await res.json();
+  if (data.success) {
+    const p = data.package;
+    document.getElementById('modalVersion').textContent = 'v' + p.latestVersion + ' · ' + (p.license||'No license') + ' · ' + p.totalVersions + ' phiên bản';
+    document.getElementById('modalBody').innerHTML = buildModalContent(p);
+  } else {
+    document.getElementById('modalBody').innerHTML = '<div style="color:var(--red);">Lỗi: ' + escHtml(data.error) + '</div>';
+  }
+}
+
+function buildModalContent(p) {
+  const allSub = [...p.dependencies, ...p.devDependencies, ...p.peerDependencies];
+  let html = '<div class="detail-grid">' +
+    '<div class="detail-field"><label>Ngày phát hành</label><div class="val">' + fmtDate(p.created) + ' <small>(' + timeAgo(p.created) + ')</small></div></div>' +
+    '<div class="detail-field"><label>Cập nhật gần nhất</label><div class="val">' + fmtDate(p.latestPublished||p.modified) + ' <small>(' + timeAgo(p.latestPublished||p.modified) + ')</small></div></div>' +
+    '<div class="detail-field"><label>Tổng phiên bản</label><div class="val">' + p.totalVersions + '</div></div>' +
+    '<div class="detail-field"><label>Downloads / tuần</label><div class="val">' + (p.weeklyDownloads != null ? fmtNum(p.weeklyDownloads) : '—') + '</div></div>' +
+    '<div class="detail-field"><label>Tác giả</label><div class="val">' + (escHtml(p.author)||'—') + '</div></div>' +
+    '<div class="detail-field"><label>License</label><div class="val">' + (escHtml(p.license)||'—') + '</div></div>';
+
+  if (p.homepage) {
+    html += '<div class="detail-field" style="grid-column:1/-1"><label>Homepage</label><div class="val"><a href="' + escHtml(p.homepage) + '" target="_blank" rel="noopener">' + escHtml(p.homepage) + '</a></div></div>';
+  }
+  html += '<div class="detail-field"><label>npm URL</label><div class="val"><a href="' + p.npmUrl + '" target="_blank" rel="noopener">' + p.npmUrl + '</a></div></div>';
+  if (p.description) {
+    html += '<div class="detail-field" style="grid-column:1/-1"><label>Mô tả</label><div class="val">' + escHtml(p.description) + '</div></div>';
+  }
+  html += '</div>';
+
+  // ────── Security / CVE Section ──────
+  const cve = cveData[p.name];
+  html += '<div class="deps-section">' +
+    '<div class="section-title" style="display:flex;align-items:center;gap:8px;">' +
+    '<span class="icon-svg" style="color:' + (cve && cve.totalVulns > 0 ? 'var(--red)' : 'var(--green)') + '">' + (cve && cve.totalVulns > 0 ? SVG.shieldOff : SVG.shield) + '</span>' +
+    ' Bảo mật / CVE' +
+    '</div>';
+  if (cve && cve.totalVulns > 0) {
+    html += '<div style="margin-bottom:8px;">' +
+      '<span class="cve-badge ' + (cve.hasCritical ? 'critical' : cve.hasHigh ? 'high' : 'medium') + '">' +
+      cve.totalVulns + ' lỗ hổng được phát hiện</span></div>';
+    html += '<div class="vuln-list">';
+    cve.vulns.forEach(function(v) {
+      const sevClass = v.severity ? v.severity.toLowerCase() : 'unknown';
+      const aliases = v.aliases.length > 0 ? v.aliases.join(', ') : v.id;
+      const osvUrl = 'https://osv.dev/vulnerability/' + encodeURIComponent(v.id);
+      html += '<div class="vuln-item severity-' + sevClass + '">' +
+        '<div class="vuln-id"><a href="' + osvUrl + '" target="_blank" rel="noopener">' + escHtml(v.id) + '</a>' +
+        ' <span class="cve-badge ' + sevClass + '" style="font-size:9px;">' + escHtml(v.severity || 'UNKNOWN') + '</span></div>' +
+        (v.summary ? '<div class="vuln-summary">' + escHtml(v.summary) + '</div>' : '') +
+        '<div class="vuln-meta">' +
+        (v.aliases.length > 0 ? '<span>CVE: ' + escHtml(v.aliases.join(', ')) + '</span>' : '') +
+        (v.published ? '<span>Phát hiện: ' + fmtDate(v.published) + '</span>' : '') +
+        (v.affectedVersions.length > 0 ? '<span>Phiên bản: ' + escHtml(v.affectedVersions.join(' | ')) + '</span>' : '') +
+        '</div>' +
+        (v.references.length > 0 ? '<div style="margin-top:6px;font-size:11px;">' +
+          v.references.map(function(r) { return '<a href="' + escHtml(r.url) + '" target="_blank" rel="noopener" style="color:var(--accent);margin-right:12px;">' + escHtml(r.type || 'Link') + '</a>'; }).join('') +
+        '</div>' : '') +
+        '</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div style="color:var(--green);font-size:13px;display:flex;align-items:center;gap:6px;">' + SVG.shield + ' Không phát hiện lỗ hổng bảo mật nào</div>';
+  }
+  html += '</div>';
+
+  // ────── Usage Detection Section ──────
+  const usage = usageData[p.name];
+  html += '<div class="deps-section">' +
+    '<div class="section-title" style="display:flex;align-items:center;gap:8px;">' +
+    '<span class="icon-svg">' + SVG.fileCode + '</span> Mức độ sử dụng trong project</div>';
+  if (usage && usage.isUsed) {
+    html += '<div style="margin-bottom:8px;"><span class="usage-badge used">' + SVG.check + ' Đang được sử dụng trong ' + usage.fileCount + ' file</span></div>';
+    if (usage.statements && usage.statements.length > 0) {
+      html += '<div class="usage-file-list">';
+      usage.statements.forEach(function(s) {
+        html += '<div class="usage-file-item">' + escHtml(s.file) + '<div class="usage-statement">' + escHtml(s.code) + '</div></div>';
+      });
+      html += '</div>';
+    }
+    if (usage.files && usage.files.length > 0) {
+      html += '<div style="margin-top:8px;font-size:11px;color:var(--text3);">Files: ' + usage.files.slice(0, 10).map(function(f) { return escHtml(f); }).join(', ') +
+        (usage.files.length > 10 ? ' và ' + (usage.files.length - 10) + ' files khác' : '') + '</div>';
+    }
+  } else {
+    html += '<div style="color:var(--red);font-size:13px;display:flex;align-items:center;gap:6px;">' + SVG.xCircle + ' Thư viện này được khai báo nhưng không tìm thấy import/require nào trong source code</div>';
+  }
+  html += '</div>';
+
+  // ────── Dependency Tree Section ──────
+  html += '<div class="deps-section">' +
+    '<div class="section-title" style="display:flex;align-items:center;gap:8px;">' +
+    '<span class="icon-svg">' + SVG.gitBranch + '</span> Cây phụ thuộc</div>' +
+    '<div id="depTreeContainer_' + escHtml(p.name).replace(/[^a-zA-Z0-9]/g, '_') + '" class="dep-tree">' +
+    '<div class="tree-loading">' + SVG.loader + ' Đang tải cây phụ thuộc...</div></div></div>';
+
+  // Trigger async tree load
+  setTimeout(function() { loadDepTree(p.name); }, 100);
+
+  if (p.keywords.length) {
+    html += '<div style="margin-bottom:16px;"><div class="section-title">Keywords</div><div class="kw-chips">' +
+      p.keywords.map(k => '<span class="kw-chip">' + escHtml(k) + '</span>').join('') + '</div></div>';
+  }
+  if (p.dependencies.length) {
+    html += '<div class="deps-section"><div class="section-title">Dependencies (' + p.dependencies.length + ')</div><div class="deps-chips">' +
+      p.dependencies.map(d => '<span class="chip" onclick="openPackageModal(\'' + escHtml(d) + '\')">' + escHtml(d) + '</span>').join('') + '</div></div>';
+  }
+  if (p.devDependencies.length) {
+    html += '<div class="deps-section"><div class="section-title">Dev Dependencies (' + p.devDependencies.length + ')</div><div class="deps-chips">' +
+      p.devDependencies.map(d => '<span class="chip" onclick="openPackageModal(\'' + escHtml(d) + '\')">' + escHtml(d) + '</span>').join('') + '</div></div>';
+  }
+  if (p.peerDependencies.length) {
+    html += '<div class="deps-section"><div class="section-title">Peer Dependencies (' + p.peerDependencies.length + ')</div><div class="deps-chips">' +
+      p.peerDependencies.map(d => '<span class="chip" onclick="openPackageModal(\'' + escHtml(d) + '\')">' + escHtml(d) + '</span>').join('') + '</div></div>';
+  }
+  if (allSub.length === 0) {
+    html += '<div style="color:var(--text3);font-size:13px;">Không có thư viện con</div>';
+  }
+  return html;
+}
+
+// ─── Dependency Tree Loader ───────────────────────────────────────────────────
+async function loadDepTree(name) {
+  const containerId = 'depTreeContainer_' + name.replace(/[^a-zA-Z0-9]/g, '_');
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/dep-tree/' + encodeURIComponent(name) + '?depth=3');
+    const data = await res.json();
+    if (data.success && data.tree) {
+      container.innerHTML = renderTreeNode(data.tree, true);
+    } else {
+      container.innerHTML = '<div style="color:var(--text3);font-size:12px;">Không thể tải cây phụ thuộc</div>';
+    }
+  } catch (e) {
+    container.innerHTML = '<div style="color:var(--red);font-size:12px;">Lỗi: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderTreeNode(node, isRoot) {
+  if (!node) return '';
+  const vulnClass = node.totalVulns > 0 ? (node.hasCritical ? 'danger' : 'warn') : 'safe';
+  const hasChildren = node.children && node.children.length > 0;
+  const toggleId = 'tree_' + Math.random().toString(36).substr(2, 9);
+
+  let html = '<div class="tree-node" style="' + (isRoot ? 'padding-left:0;' : '') + '">';
+  html += '<div class="tree-node-label" ' + (hasChildren ? 'onclick="toggleTreeNode(\'' + toggleId + '\')"' : '') + '>';
+
+  if (hasChildren) {
+    html += '<span class="tree-toggle" id="toggle_' + toggleId + '">' + SVG.chevronDown + '</span>';
+  } else {
+    html += '<span style="width:14px;display:inline-block;"></span>';
+  }
+
+  html += '<span class="tree-vuln-dot ' + vulnClass + '" title="' +
+    (node.totalVulns > 0 ? node.totalVulns + ' CVE' : 'An toàn') + '"></span>';
+  html += '<span class="tn-name">' + escHtml(node.name) + '</span>';
+  if (node.version) html += '<span class="tn-ver">v' + escHtml(node.version) + '</span>';
+  if (node.totalVulns > 0) {
+    html += ' <span class="cve-badge ' + (node.hasCritical ? 'critical' : node.hasHigh ? 'high' : 'medium') + '" style="font-size:9px;">' + node.totalVulns + ' CVE</span>';
+  }
+  if (node.circular) {
+    html += ' <span style="font-size:10px;color:var(--yellow);">(circular)</span>';
+  }
+  html += '</div>';
+
+  if (hasChildren) {
+    html += '<div class="tree-node-children" id="children_' + toggleId + '">';
+    node.children.forEach(function(child) {
+      html += renderTreeNode(child, false);
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function toggleTreeNode(id) {
+  const children = document.getElementById('children_' + id);
+  const toggle = document.getElementById('toggle_' + id);
+  if (!children || !toggle) return;
+  const isCollapsed = toggle.classList.toggle('collapsed');
+  children.style.display = isCollapsed ? 'none' : 'block';
+}
+
+function closeModal(e) { if (e.target === document.getElementById('overlay')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('overlay').classList.remove('open'); }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function setFilter(type, el) {
+  filterType = type;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function sortBy(key) {
+  const sel = document.getElementById('sortSelect');
+  const map = { name:'name-asc', version:'name-asc', security:'vulns-desc', usage:'unused-first', created:'created-desc', modified:'modified-desc', deps:'deps-desc', downloads:'downloads-desc' };
+  sel.value = map[key] || 'name-asc';
+  renderTable();
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+
+function compareDates(a, b) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return new Date(a) - new Date(b);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return '—';
+  return d.toLocaleDateString('vi-VN', { year:'numeric', month:'2-digit', day:'2-digit' });
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso);
+  const days = Math.floor(diff / 86400000);
+  if (days < 1) return 'hôm nay';
+  if (days < 30) return days + ' ngày trước';
+  if (days < 365) return Math.floor(days/30) + ' tháng trước';
+  return Math.floor(days/365) + ' năm trước';
+}
+
+function fmtNum(n) {
+  if (n == null) return '—';
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, function(c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+let toastTimer;
+function showToast(msg, type) {
+  type = type || '';
+  const t = document.getElementById('toast');
+  const icon = type === 'success' ? SVG.check : type === 'error' ? SVG.xCircle : '';
+  const colorVar = type === 'success' ? '--green' : '--red';
+  t.innerHTML = (icon ? '<span class="icon-svg" style="flex-shrink:0;color:var(' + colorVar + ')">' + icon + '</span>' : '') + '<span>' + escHtml(msg) + '</span>';
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.className = ''; }, 3500);
+}
+
+// ─── Change Project ───────────────────────────────────────────────────────────
+async function changeProject() {
+  const newPath = document.getElementById('pathInput').value.trim();
+  if (!newPath) return showToast('Vui lòng nhập đường dẫn project', 'error');
+  try {
+    const res = await fetch('/api/set-project', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ projectPath: newPath })
+    });
+    const data = await res.json();
+    if (data.success) {
+      allPackages = [];
+      cveData = {};
+      usageData = {};
+      updateStatsCards(0, 0, 0);
+      document.getElementById('statSubDeps').textContent = '—';
+      document.getElementById('statErrors').textContent = '—';
+      document.getElementById('statVulns').textContent = '—';
+      document.getElementById('statAffected').textContent = '—';
+      document.getElementById('statUnused').textContent = '—';
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">' + SVG.package + '</div><h3>Project mới đã được chọn</h3><p>Nhấn Phân tích để bắt đầu</p></div></td></tr>';
+      document.getElementById('chartsRow').style.display = 'none';
+      document.getElementById('btnExport').disabled = true;
+      await init();
+      showToast('Đã đổi project: ' + data.projectPath, 'success');
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Lỗi: ' + e.message, 'error');
+  }
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!allPackages.length) return;
+  const headers = ['Tên','Loại','Phiên bản yêu cầu','Phiên bản mới nhất','License','Ngày phát hành','Cập nhật gần nhất','Số sub-deps','Sub-deps (deps)','Sub-deps (dev)','Sub-deps (peer)','Downloads/tuần','NPM URL'];
+  const rows = allPackages.map(function(p) {
+    return [
+      p.name, p.depType, p.requiredVersion||'', p.latestVersion||'', p.license||'',
+      p.created ? new Date(p.created).toLocaleDateString('vi-VN') : '',
+      p.latestPublished ? new Date(p.latestPublished).toLocaleDateString('vi-VN') : '',
+      p.dependencies.length + p.devDependencies.length + p.peerDependencies.length,
+      p.dependencies.join('; '), p.devDependencies.join('; '), p.peerDependencies.join('; '),
+      p.weeklyDownloads != null ? p.weeklyDownloads : '', p.npmUrl
+    ].map(function(v) { return '"' + String(v).replace(/"/g,'""') + '"'; });
+  });
+
+  const csv = '\uFEFF' + [headers].concat(rows).map(function(r) { return r.join(','); }).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'npm-report-' + Date.now() + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Đã xuất CSV', 'success');
+}
+
+// ─── Keyboard shortcuts ───────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModalDirect();
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
