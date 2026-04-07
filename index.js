@@ -5,12 +5,18 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const pLimit = require('p-limit');
+const semver = require('semver');
 
 const app = express();
 const PORT = process.env.PORT || 3838;
 
 // Đường dẫn project npm cần phân tích (truyền qua CLI hoặc mặc định là thư mục hiện tại)
 let TARGET_PROJECT = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+
+// GitHub mode: khi phân tích từ GitHub URL thay vì local path
+let githubMode = false;
+let githubPackageJson = null;
+let githubRepoInfo = null; // { owner, repo, branch, url }
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -98,14 +104,60 @@ async function fetchPackageInfo(name) {
 }
 
 /**
- * Đọc package.json của project mục tiêu
+ * Đọc package.json của project mục tiêu (local hoặc GitHub)
  */
 function readTargetPackageJson(projectPath) {
+  if (githubMode && githubPackageJson) {
+    return githubPackageJson;
+  }
   const pkgPath = path.join(projectPath, 'package.json');
   if (!fs.existsSync(pkgPath)) {
     throw new Error(`Không tìm thấy package.json tại: ${pkgPath}`);
   }
   return JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+}
+
+/**
+ * Parse GitHub URL thành { owner, repo, branch }
+ * Hỗ trợ:
+ *   https://github.com/owner/repo
+ *   https://github.com/owner/repo/tree/branch
+ *   github.com/owner/repo
+ */
+function parseGithubUrl(url) {
+  // Chuẩn hoá: bỏ trailing slash, .git
+  let cleaned = url.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  // Thêm https:// nếu thiếu
+  if (cleaned.startsWith('github.com')) cleaned = 'https://' + cleaned;
+
+  const match = cleaned.match(
+    /^https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/tree\/([^\/?#]+))?/
+  );
+  if (!match) return null;
+  return { owner: match[1], repo: match[2], branch: match[3] || 'main' };
+}
+
+/**
+ * Fetch package.json từ GitHub repo
+ */
+async function fetchGithubPackageJson(owner, repo, branch) {
+  // Thử branch được chỉ định, nếu thất bại thử 'master'
+  const branches = [branch];
+  if (branch === 'main') branches.push('master');
+
+  for (const br of branches) {
+    try {
+      const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(br)}/package.json`;
+      const { data } = await axios.get(rawUrl, { timeout: 15000 });
+      return { data, branch: br };
+    } catch (err) {
+      if (err.response?.status === 404 && br !== branches[branches.length - 1]) continue;
+      if (err.response?.status === 404) {
+        throw new Error(`Không tìm thấy package.json trong repo ${owner}/${repo} (đã thử branch: ${branches.join(', ')})`);
+      }
+      throw err;
+    }
+  }
 }
 
 // ─── API Endpoints ───────────────────────────────────────────────────────────
@@ -114,15 +166,20 @@ function readTargetPackageJson(projectPath) {
 app.get('/api/project-info', (req, res) => {
   try {
     const pkg = readTargetPackageJson(TARGET_PROJECT);
+    const projectSource = githubMode
+      ? `https://github.com/${githubRepoInfo.owner}/${githubRepoInfo.repo}`
+      : TARGET_PROJECT;
     res.json({
       success: true,
-      projectPath: TARGET_PROJECT,
-      name: pkg.name || path.basename(TARGET_PROJECT),
+      projectPath: projectSource,
+      name: pkg.name || (githubMode ? githubRepoInfo.repo : path.basename(TARGET_PROJECT)),
       version: pkg.version || '0.0.0',
       description: pkg.description || '',
       totalDeps: Object.keys(pkg.dependencies || {}).length,
       totalDevDeps: Object.keys(pkg.devDependencies || {}).length,
       totalPeerDeps: Object.keys(pkg.peerDependencies || {}).length,
+      isGithub: githubMode,
+      githubUrl: githubMode ? `https://github.com/${githubRepoInfo.owner}/${githubRepoInfo.repo}` : null,
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -215,13 +272,111 @@ app.post('/api/set-project', (req, res) => {
     });
   }
   TARGET_PROJECT = resolved;
+  githubMode = false;
+  githubPackageJson = null;
+  githubRepoInfo = null;
   cache.clear();
   cveCache.clear();
   usageCache.clear();
   res.json({ success: true, projectPath: resolved });
 });
 
+/** Thay đổi sang GitHub repo */
+app.post('/api/set-github', async (req, res) => {
+  const { githubUrl } = req.body;
+  if (!githubUrl) return res.status(400).json({ success: false, error: 'Thiếu githubUrl' });
+
+  const parsed = parseGithubUrl(githubUrl);
+  if (!parsed) {
+    return res.status(400).json({
+      success: false,
+      error: 'URL GitHub không hợp lệ. Ví dụ: https://github.com/owner/repo',
+    });
+  }
+
+  try {
+    const result = await fetchGithubPackageJson(parsed.owner, parsed.repo, parsed.branch);
+    githubPackageJson = result.data;
+    githubRepoInfo = { owner: parsed.owner, repo: parsed.repo, branch: result.branch, url: githubUrl };
+    githubMode = true;
+    cache.clear();
+    cveCache.clear();
+    usageCache.clear();
+    res.json({
+      success: true,
+      owner: parsed.owner,
+      repo: parsed.repo,
+      branch: result.branch,
+      projectName: githubPackageJson.name || parsed.repo,
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // ─── CVE / Vulnerability Check (OSV.dev API) ─────────────────────────────────
+
+/**
+ * Kiểm tra 1 version cụ thể có bị ảnh hưởng bởi 1 vuln hay không
+ * Dựa vào affected[].ranges[].events (introduced / fixed / last_affected)
+ */
+function isVersionAffectedByVuln(vuln, pkgName, version) {
+  if (!version || !vuln.affected) return null; // không xác định được
+  const cleanVer = semver.coerce(version);
+  if (!cleanVer) return null;
+
+  const found = vuln.affected.find(
+    (a) => a.package?.name === pkgName && a.package?.ecosystem === 'npm'
+  );
+  if (!found) return null;
+
+  // Nếu có danh sách versions cụ thể
+  if (found.versions && found.versions.length > 0) {
+    return found.versions.includes(cleanVer.version);
+  }
+
+  // Kiểm tra theo ranges
+  if (!found.ranges || found.ranges.length === 0) return null;
+
+  for (const range of found.ranges) {
+    if (range.type !== 'ECOSYSTEM' && range.type !== 'SEMVER') continue;
+    const events = range.events || [];
+
+    let introduced = null;
+    let fixed = null;
+    let lastAffected = null;
+
+    for (const ev of events) {
+      if (ev.introduced !== undefined) introduced = ev.introduced;
+      if (ev.fixed !== undefined) fixed = ev.fixed;
+      if (ev.last_affected !== undefined) lastAffected = ev.last_affected;
+    }
+
+    // introduced = "0" nghĩa là tất cả versions
+    const introVer = introduced === '0' ? '0.0.0' : introduced;
+    const introSemver = introVer ? semver.coerce(introVer) : null;
+
+    if (introSemver && semver.lt(cleanVer, introSemver)) continue; // version trước khi lỗi được introduce
+
+    if (fixed) {
+      const fixedSemver = semver.coerce(fixed);
+      if (fixedSemver && semver.gte(cleanVer, fixedSemver)) continue; // đã fix
+      // Version nằm giữa introduced và fixed => bị ảnh hưởng
+      return true;
+    }
+
+    if (lastAffected) {
+      const lastSemver = semver.coerce(lastAffected);
+      if (lastSemver && semver.lte(cleanVer, lastSemver)) return true;
+      continue;
+    }
+
+    // Chỉ có introduced, không có fixed => vẫn bị ảnh hưởng
+    if (introSemver && semver.gte(cleanVer, introSemver)) return true;
+  }
+
+  return false;
+}
 
 /**
  * Fetch CVE/vulnerability data cho 1 package từ OSV.dev
@@ -238,17 +393,20 @@ async function fetchVulnerabilities(name) {
 
     const vulns = (data.vulns || []).map((v) => ({
       id: v.id,
-      summary: v.summary || v.details?.slice(0, 200) || '',
+      summary: v.summary || v.details?.slice(0, 300) || '',
+      details: v.details || '',
       severity: extractSeverity(v),
       published: v.published || null,
       modified: v.modified || null,
       aliases: (v.aliases || []).filter((a) => a.startsWith('CVE-')),
       affectedVersions: extractAffectedVersions(v, name),
-      references: (v.references || []).slice(0, 3).map((r) => ({
+      fixedVersions: extractFixedVersions(v, name),
+      references: (v.references || []).map((r) => ({
         type: r.type,
         url: r.url,
       })),
       withdrawn: v.withdrawn || null,
+      _raw_affected: v.affected || [], // giữ raw data để check version
     }));
 
     const result = {
@@ -266,6 +424,60 @@ async function fetchVulnerabilities(name) {
     cveCache.set(name, fallback);
     return fallback;
   }
+}
+
+/**
+ * Thêm thông tin version-specific cho CVE result
+ * - Kiểm tra từng CVE xem version đang dùng có bị ảnh hưởng không
+ * - Tách ra: vulns affecting used version vs fixed/not-affecting
+ */
+function enrichCveWithVersion(cveResult, pkgName, usedVersion) {
+  if (!usedVersion || !cveResult.vulns || cveResult.vulns.length === 0) {
+    return {
+      ...cveResult,
+      usedVersion: usedVersion || null,
+      affectingUsedVersion: [],
+      fixedForUsedVersion: [],
+      unknownForUsedVersion: [],
+      activeVulnCount: 0,
+    };
+  }
+
+  const affecting = [];
+  const fixed = [];
+  const unknown = [];
+
+  for (const vuln of cveResult.vulns) {
+    const rawVuln = { affected: vuln._raw_affected };
+    const isAffected = isVersionAffectedByVuln(rawVuln, pkgName, usedVersion);
+
+    const vulnOut = { ...vuln };
+    delete vulnOut._raw_affected; // không gửi raw data về client
+
+    if (isAffected === true) {
+      vulnOut.affectsUsedVersion = true;
+      affecting.push(vulnOut);
+    } else if (isAffected === false) {
+      vulnOut.affectsUsedVersion = false;
+      fixed.push(vulnOut);
+    } else {
+      vulnOut.affectsUsedVersion = null; // không xác định
+      unknown.push(vulnOut);
+    }
+  }
+
+  return {
+    name: cveResult.name,
+    totalVulns: cveResult.totalVulns,
+    hasCritical: cveResult.hasCritical,
+    hasHigh: cveResult.hasHigh,
+    usedVersion,
+    activeVulnCount: affecting.length,
+    affectingUsedVersion: affecting,
+    fixedForUsedVersion: fixed,
+    unknownForUsedVersion: unknown,
+    allVulns: [...affecting, ...unknown, ...fixed], // sắp xếp: ảnh hưởng trước
+  };
 }
 
 function extractSeverity(vuln) {
@@ -325,7 +537,7 @@ function extractAffectedVersions(vuln, pkgName) {
     (a) => a.package?.name === pkgName && a.package?.ecosystem === 'npm'
   );
   if (!found || !found.ranges) return [];
-  return found.ranges.slice(0, 3).map((r) => {
+  return found.ranges.map((r) => {
     const events = (r.events || []).map((e) => {
       if (e.introduced) return `>= ${e.introduced}`;
       if (e.fixed) return `< ${e.fixed}`;
@@ -336,39 +548,68 @@ function extractAffectedVersions(vuln, pkgName) {
   });
 }
 
-/** API: check CVE cho 1 package */
+function extractFixedVersions(vuln, pkgName) {
+  if (!vuln.affected) return [];
+  const found = vuln.affected.find(
+    (a) => a.package?.name === pkgName && a.package?.ecosystem === 'npm'
+  );
+  if (!found || !found.ranges) return [];
+  const fixedVersions = [];
+  for (const range of found.ranges) {
+    for (const ev of (range.events || [])) {
+      if (ev.fixed) fixedVersions.push(ev.fixed);
+    }
+  }
+  return fixedVersions;
+}
+
+/** API: check CVE cho 1 package (optional: ?version=x.x.x) */
 app.get('/api/cve/:name(*)', async (req, res) => {
   try {
     const result = await fetchVulnerabilities(req.params.name);
+    const version = req.query.version || null;
+    if (version) {
+      const enriched = enrichCveWithVersion(result, req.params.name, version);
+      return res.json({ success: true, ...enriched });
+    }
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-/** API: check CVE cho tất cả packages trong project */
+/** API: check CVE cho tất cả packages trong project (version-aware) */
 app.get('/api/cve-all', async (req, res) => {
   try {
     const pkg = readTargetPackageJson(TARGET_PROJECT);
-    const allNames = [
-      ...Object.keys(pkg.dependencies || {}),
-      ...Object.keys(pkg.devDependencies || {}),
-      ...Object.keys(pkg.peerDependencies || {}),
+    const allDeps = [
+      ...Object.entries(pkg.dependencies || {}).map(([n, v]) => ({ name: n, version: v })),
+      ...Object.entries(pkg.devDependencies || {}).map(([n, v]) => ({ name: n, version: v })),
+      ...Object.entries(pkg.peerDependencies || {}).map(([n, v]) => ({ name: n, version: v })),
     ];
 
     const limit = pLimit(8);
     const results = await Promise.all(
-      allNames.map((name) => limit(() => fetchVulnerabilities(name)))
+      allDeps.map(({ name, version }) =>
+        limit(async () => {
+          const raw = await fetchVulnerabilities(name);
+          return enrichCveWithVersion(raw, name, version);
+        })
+      )
     );
 
     const totalVulns = results.reduce((a, r) => a + r.totalVulns, 0);
+    const totalActiveVulns = results.reduce((a, r) => a + r.activeVulnCount, 0);
     const affectedPackages = results.filter((r) => r.totalVulns > 0);
+    const activeAffectedPackages = results.filter((r) => r.activeVulnCount > 0);
 
     res.json({
       success: true,
-      totalPackages: allNames.length,
+      totalPackages: allDeps.length,
       totalVulns,
+      totalActiveVulns,
       affectedCount: affectedPackages.length,
+      activeAffectedCount: activeAffectedPackages.length,
       packages: results,
     });
   } catch (err) {
@@ -524,6 +765,18 @@ function scanProjectUsage(projectPath) {
 
 /** API: Check usage cho tất cả packages */
 app.get('/api/usage', (req, res) => {
+  // Usage scanning không khả dụng khi dùng GitHub mode (không có local files)
+  if (githubMode) {
+    return res.json({
+      success: true,
+      totalScanned: 0,
+      usedCount: 0,
+      unusedCount: 0,
+      packages: [],
+      isGithub: true,
+      note: 'Usage scanning không khả dụng cho GitHub repos (không có source code local)',
+    });
+  }
   try {
     const pkg = readTargetPackageJson(TARGET_PROJECT);
     const allDeps = [

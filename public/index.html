@@ -398,6 +398,34 @@
   .vuln-item .vuln-summary { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 6px; }
   .vuln-item .vuln-meta { font-size: 11px; color: var(--text3); display: flex; flex-wrap: wrap; gap: 12px; }
 
+  /* ── Version-aware CVE indicators ── */
+  .vuln-version-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .vuln-version-badge.active { background: rgba(239,69,101,.18); color: var(--red); border: 1px solid rgba(239,69,101,.4); }
+  .vuln-version-badge.fixed { background: rgba(67,217,140,.12); color: var(--green); border: 1px solid rgba(67,217,140,.3); }
+  .vuln-version-badge.unknown-ver { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+  .vuln-item.vuln-fixed { opacity: .55; }
+  .vuln-item.vuln-fixed:hover { opacity: .85; }
+  .vuln-section-header {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0; margin-top: 8px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .vuln-section-header.danger-header { color: var(--red); }
+  .vuln-section-header.safe-header { color: var(--green); }
+  .vuln-section-header.unknown-header { color: var(--text3); }
+  .vuln-toggle-btn {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 12px; font-size: 11px; color: var(--text2); cursor: pointer;
+    transition: all .15s; margin-top: 8px;
+  }
+  .vuln-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .vuln-fixed-version { font-size: 11px; color: var(--green); display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .security-summary {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px;
+  }
+
   /* ── Usage badges ── */
   .usage-badge {
     font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
@@ -494,12 +522,32 @@
 
   <!-- Path Bar -->
   <div class="path-bar">
-    <label>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      Project path:
-    </label>
-    <input type="text" class="path-input" id="pathInput" placeholder="D:\my-project hoặc /home/user/my-project" />
-    <button class="btn btn-outline" onclick="changeProject()">Đổi project</button>
+    <div class="filter-tabs" style="flex-shrink:0;">
+      <button class="tab active" id="tabLocal" onclick="setSourceMode('local', this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Local
+      </button>
+      <button class="tab" id="tabGithub" onclick="setSourceMode('github', this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </button>
+    </div>
+    <div id="localInputWrap" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+      <label style="color:var(--text2);font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Project path:
+      </label>
+      <input type="text" class="path-input" id="pathInput" placeholder="D:\my-project hoặc /home/user/my-project" style="flex:1;" />
+      <button class="btn btn-outline" onclick="changeProject()">Đổi project</button>
+    </div>
+    <div id="githubInputWrap" style="display:none;align-items:center;gap:12px;flex:1;min-width:0;">
+      <label style="color:var(--text2);font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub URL:
+      </label>
+      <input type="text" class="path-input" id="githubInput" placeholder="https://github.com/owner/repo hoặc https://github.com/owner/repo/tree/branch" style="flex:1;" />
+      <button class="btn btn-outline" onclick="changeToGithub()">Tải từ GitHub</button>
+    </div>
   </div>
 
   <!-- Stats Cards -->
@@ -535,14 +583,19 @@
       <div class="stat-sub">không lấy được thông tin</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Lỗ hổng bảo mật</div>
+      <div class="stat-label">CVE còn ảnh hưởng</div>
       <div class="stat-value c-red" id="statVulns">—</div>
-      <div class="stat-sub" id="statVulnsSub">CVE / vulnerabilities</div>
+      <div class="stat-sub" id="statVulnsSub">trong phiên bản đang dùng</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tổng CVE phát hiện</div>
+      <div class="stat-value c-yellow" id="statTotalVulns">—</div>
+      <div class="stat-sub">tất cả phiên bản</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Package có CVE</div>
       <div class="stat-value c-yellow" id="statAffected">—</div>
-      <div class="stat-sub">bị ảnh hưởng</div>
+      <div class="stat-sub" id="statAffectedSub">bị ảnh hưởng</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Không sử dụng</div>
@@ -707,8 +760,21 @@ async function init() {
     const res = await fetch('/api/project-info');
     const data = await res.json();
     if (data.success) {
-      document.getElementById('projectName').textContent = data.name + ' v' + data.version;
-      document.getElementById('pathInput').value = data.projectPath;
+      const nameLabel = data.name + ' v' + data.version;
+      document.getElementById('projectName').textContent = data.isGithub
+        ? '🐙 ' + nameLabel
+        : nameLabel;
+      if (data.isGithub) {
+        document.getElementById('githubInput').value = data.githubUrl || '';
+        // Auto-switch to GitHub tab if in GitHub mode
+        sourceMode = 'github';
+        document.getElementById('tabLocal').classList.remove('active');
+        document.getElementById('tabGithub').classList.add('active');
+        document.getElementById('localInputWrap').style.display = 'none';
+        document.getElementById('githubInputWrap').style.display = 'flex';
+      } else {
+        document.getElementById('pathInput').value = data.projectPath;
+      }
       updateStatsCards(data.totalDeps, data.totalDevDeps, data.totalPeerDeps);
     }
   } catch(e) {
@@ -798,21 +864,34 @@ function updateAfterAnalyze() {
   document.getElementById('statErrors').textContent = errors;
 
   // Security stats
-  let totalVulns = 0, affectedPkgs = 0;
+  let totalVulns = 0, totalActiveVulns = 0, affectedPkgs = 0, activeAffectedPkgs = 0;
   for (const name of Object.keys(cveData)) {
     const c = cveData[name];
     if (c.totalVulns > 0) { affectedPkgs++; totalVulns += c.totalVulns; }
+    if (c.activeVulnCount > 0) { activeAffectedPkgs++; totalActiveVulns += c.activeVulnCount; }
   }
-  document.getElementById('statVulns').textContent = totalVulns || '0';
-  document.getElementById('statVulnsSub').textContent = totalVulns > 0 ? 'CVE / vulnerabilities' : 'Không phát hiện CVE';
+  document.getElementById('statVulns').textContent = totalActiveVulns || '0';
+  document.getElementById('statVulnsSub').textContent = totalActiveVulns > 0
+    ? 'còn khai thác được trong version đang dùng'
+    : 'Không còn CVE nào ảnh hưởng';
+  document.getElementById('statTotalVulns').textContent = totalVulns || '0';
   document.getElementById('statAffected').textContent = affectedPkgs || '0';
+  document.getElementById('statAffectedSub').textContent = activeAffectedPkgs > 0
+    ? activeAffectedPkgs + ' pkg còn lỗ hổng active'
+    : 'không còn lỗ hổng active';
 
   // Usage stats
   let unusedCount = 0;
-  for (const name of Object.keys(usageData)) {
-    if (!usageData[name].isUsed) unusedCount++;
+  if (Object.keys(usageData).length > 0) {
+    for (const name of Object.keys(usageData)) {
+      if (!usageData[name].isUsed) unusedCount++;
+    }
+    document.getElementById('statUnused').textContent = unusedCount || '0';
+  } else if (sourceMode === 'github') {
+    document.getElementById('statUnused').textContent = 'N/A';
+  } else {
+    document.getElementById('statUnused').textContent = '0';
   }
-  document.getElementById('statUnused').textContent = unusedCount || '0';
 
   renderCharts();
   renderTable();
@@ -913,12 +992,22 @@ function renderRow(p) {
   const allSubDeps = [...p.dependencies, ...p.devDependencies, ...p.peerDependencies];
   const dlClass = p.weeklyDownloads > 1000000 ? 'high' : p.weeklyDownloads > 50000 ? 'med' : 'low';
 
-  // Security column
+  // Security column (version-aware)
   const cve = cveData[p.name];
   let securityHtml = '';
   if (cve && cve.totalVulns > 0) {
-    const sevClass = cve.hasCritical ? 'critical' : cve.hasHigh ? 'high' : 'medium';
-    securityHtml = '<span class="cve-badge ' + sevClass + '">' + SVG.shieldOff + ' ' + cve.totalVulns + ' CVE</span>';
+    if (cve.activeVulnCount > 0) {
+      const sevClass = cve.affectingUsedVersion?.some(v => v.severity === 'CRITICAL') ? 'critical'
+        : cve.affectingUsedVersion?.some(v => v.severity === 'HIGH') ? 'high' : 'medium';
+      securityHtml = '<span class="cve-badge ' + sevClass + '">' + SVG.shieldOff + ' ' + cve.activeVulnCount + ' active</span>';
+      if (cve.fixedForUsedVersion?.length > 0) {
+        securityHtml += '<div style="margin-top:3px;"><span class="cve-badge safe" style="font-size:9px;opacity:.7;">' + cve.fixedForUsedVersion.length + ' đã fix</span></div>';
+      }
+    } else {
+      // Có CVE nhưng version đang dùng đã được fix hết
+      securityHtml = '<span class="cve-badge safe">' + SVG.shield + ' Đã fix</span>'
+        + '<div style="font-size:10px;color:var(--text3);margin-top:2px;">' + cve.totalVulns + ' CVE (đã fix)</div>';
+    }
   } else if (cve) {
     securityHtml = '<span class="cve-badge safe">' + SVG.shield + ' An toàn</span>';
   } else {
@@ -1025,37 +1114,75 @@ function buildModalContent(p) {
   }
   html += '</div>';
 
-  // ────── Security / CVE Section ──────
+  // ────── Security / CVE Section (version-aware) ──────
   const cve = cveData[p.name];
+  const usedVer = cve?.usedVersion || p.requiredVersion || null;
+  const hasActiveVulns = cve && cve.activeVulnCount > 0;
+  const iconColor = hasActiveVulns ? 'var(--red)' : (cve && cve.totalVulns > 0 ? 'var(--yellow)' : 'var(--green)');
+
   html += '<div class="deps-section">' +
     '<div class="section-title" style="display:flex;align-items:center;gap:8px;">' +
-    '<span class="icon-svg" style="color:' + (cve && cve.totalVulns > 0 ? 'var(--red)' : 'var(--green)') + '">' + (cve && cve.totalVulns > 0 ? SVG.shieldOff : SVG.shield) + '</span>' +
+    '<span class="icon-svg" style="color:' + iconColor + '">' + (cve && cve.totalVulns > 0 ? SVG.shieldOff : SVG.shield) + '</span>' +
     ' Bảo mật / CVE' +
+    (usedVer ? ' <span style="font-size:11px;font-weight:400;color:var(--text3);">(version đang dùng: ' + escHtml(usedVer) + ')</span>' : '') +
     '</div>';
+
   if (cve && cve.totalVulns > 0) {
-    html += '<div style="margin-bottom:8px;">' +
-      '<span class="cve-badge ' + (cve.hasCritical ? 'critical' : cve.hasHigh ? 'high' : 'medium') + '">' +
-      cve.totalVulns + ' lỗ hổng được phát hiện</span></div>';
-    html += '<div class="vuln-list">';
-    cve.vulns.forEach(function(v) {
-      const sevClass = v.severity ? v.severity.toLowerCase() : 'unknown';
-      const aliases = v.aliases.length > 0 ? v.aliases.join(', ') : v.id;
-      const osvUrl = 'https://osv.dev/vulnerability/' + encodeURIComponent(v.id);
-      html += '<div class="vuln-item severity-' + sevClass + '">' +
-        '<div class="vuln-id"><a href="' + osvUrl + '" target="_blank" rel="noopener">' + escHtml(v.id) + '</a>' +
-        ' <span class="cve-badge ' + sevClass + '" style="font-size:9px;">' + escHtml(v.severity || 'UNKNOWN') + '</span></div>' +
-        (v.summary ? '<div class="vuln-summary">' + escHtml(v.summary) + '</div>' : '') +
-        '<div class="vuln-meta">' +
-        (v.aliases.length > 0 ? '<span>CVE: ' + escHtml(v.aliases.join(', ')) + '</span>' : '') +
-        (v.published ? '<span>Phát hiện: ' + fmtDate(v.published) + '</span>' : '') +
-        (v.affectedVersions.length > 0 ? '<span>Phiên bản: ' + escHtml(v.affectedVersions.join(' | ')) + '</span>' : '') +
-        '</div>' +
-        (v.references.length > 0 ? '<div style="margin-top:6px;font-size:11px;">' +
-          v.references.map(function(r) { return '<a href="' + escHtml(r.url) + '" target="_blank" rel="noopener" style="color:var(--accent);margin-right:12px;">' + escHtml(r.type || 'Link') + '</a>'; }).join('') +
-        '</div>' : '') +
-        '</div>';
-    });
+    // Summary badges
+    html += '<div class="security-summary">';
+    html += '<span class="cve-badge ' + (cve.hasCritical ? 'critical' : cve.hasHigh ? 'high' : 'medium') + '">' +
+      'Tổng: ' + cve.totalVulns + ' CVE</span>';
+    if (cve.activeVulnCount > 0) {
+      html += ' <span class="vuln-version-badge active">' + SVG.shieldOff + ' ' + cve.activeVulnCount + ' còn ảnh hưởng version đang dùng</span>';
+    }
+    if (cve.fixedForUsedVersion && cve.fixedForUsedVersion.length > 0) {
+      html += ' <span class="vuln-version-badge fixed">' + SVG.shield + ' ' + cve.fixedForUsedVersion.length + ' đã fix trong version này</span>';
+    }
+    if (cve.unknownForUsedVersion && cve.unknownForUsedVersion.length > 0) {
+      html += ' <span class="vuln-version-badge unknown-ver">' + cve.unknownForUsedVersion.length + ' không xác định</span>';
+    }
     html += '</div>';
+
+    // ── Active vulns (affecting used version) ──
+    if (cve.affectingUsedVersion && cve.affectingUsedVersion.length > 0) {
+      html += '<div class="vuln-section-header danger-header">' + SVG.shieldOff + ' CÒN ẢNH HƯỞNG PHIÊN BẢN ĐANG DÙNG (' + cve.affectingUsedVersion.length + ')</div>';
+      html += '<div class="vuln-list">';
+      cve.affectingUsedVersion.forEach(function(v) {
+        html += renderVulnItem(v, true);
+      });
+      html += '</div>';
+    }
+
+    // ── Unknown vulns ──
+    if (cve.unknownForUsedVersion && cve.unknownForUsedVersion.length > 0) {
+      html += '<div class="vuln-section-header unknown-header">KHÔNG XÁC ĐỊNH (' + cve.unknownForUsedVersion.length + ')</div>';
+      html += '<div class="vuln-list">';
+      cve.unknownForUsedVersion.forEach(function(v) {
+        html += renderVulnItem(v, null);
+      });
+      html += '</div>';
+    }
+
+    // ── Fixed vulns (toggle show/hide) ──
+    if (cve.fixedForUsedVersion && cve.fixedForUsedVersion.length > 0) {
+      const fixedId = 'fixedVulns_' + Math.random().toString(36).substr(2, 8);
+      html += '<div class="vuln-section-header safe-header">' + SVG.shield + ' ĐÃ FIX TRONG PHIÊN BẢN NÀY (' + cve.fixedForUsedVersion.length + ')' +
+        ' <button class="vuln-toggle-btn" onclick="toggleFixedVulns(\'' + fixedId + '\', this)">Hiện chi tiết</button></div>';
+      html += '<div class="vuln-list" id="' + fixedId + '" style="display:none;">';
+      cve.fixedForUsedVersion.forEach(function(v) {
+        html += renderVulnItem(v, false);
+      });
+      html += '</div>';
+    }
+
+    // ── Fallback: if no version info, show all vulns normally ──
+    if (!cve.affectingUsedVersion && !cve.fixedForUsedVersion && !cve.unknownForUsedVersion) {
+      html += '<div class="vuln-list">';
+      (cve.allVulns || cve.vulns || []).forEach(function(v) {
+        html += renderVulnItem(v, v.affectsUsedVersion);
+      });
+      html += '</div>';
+    }
   } else {
     html += '<div style="color:var(--green);font-size:13px;display:flex;align-items:center;gap:6px;">' + SVG.shield + ' Không phát hiện lỗ hổng bảo mật nào</div>';
   }
@@ -1114,6 +1241,60 @@ function buildModalContent(p) {
     html += '<div style="color:var(--text3);font-size:13px;">Không có thư viện con</div>';
   }
   return html;
+}
+
+// ─── Vuln Item Renderer & Toggle ──────────────────────────────────────────────
+function renderVulnItem(v, isActive) {
+  const sevClass = v.severity ? v.severity.toLowerCase() : 'unknown';
+  const osvUrl = 'https://osv.dev/vulnerability/' + encodeURIComponent(v.id);
+  const fixedClass = isActive === false ? ' vuln-fixed' : '';
+
+  // Version status badge
+  let versionBadge = '';
+  if (isActive === true) {
+    versionBadge = ' <span class="vuln-version-badge active">⚠ CÒN LỖI</span>';
+  } else if (isActive === false) {
+    versionBadge = ' <span class="vuln-version-badge fixed">✓ ĐÃ FIX</span>';
+  } else if (isActive === null) {
+    versionBadge = ' <span class="vuln-version-badge unknown-ver">? Không rõ</span>';
+  }
+
+  let html = '<div class="vuln-item severity-' + sevClass + fixedClass + '">' +
+    '<div class="vuln-id">' +
+      '<a href="' + osvUrl + '" target="_blank" rel="noopener">' + escHtml(v.id) + '</a>' +
+      ' <span class="cve-badge ' + sevClass + '" style="font-size:9px;">' + escHtml(v.severity || 'UNKNOWN') + '</span>' +
+      versionBadge +
+    '</div>' +
+    (v.summary ? '<div class="vuln-summary">' + escHtml(v.summary) + '</div>' : '');
+
+  // Fixed version info
+  if (v.fixedVersions && v.fixedVersions.length > 0) {
+    html += '<div class="vuln-fixed-version">' + SVG.check + ' Fix tại version: <strong>' + escHtml(v.fixedVersions.join(', ')) + '</strong></div>';
+  }
+
+  html += '<div class="vuln-meta">' +
+    (v.aliases && v.aliases.length > 0 ? '<span>CVE: ' + escHtml(v.aliases.join(', ')) + '</span>' : '') +
+    (v.published ? '<span>Phát hiện: ' + fmtDate(v.published) + '</span>' : '') +
+    (v.affectedVersions && v.affectedVersions.length > 0 ? '<span>Ảnh hưởng: ' + escHtml(v.affectedVersions.join(' | ')) + '</span>' : '') +
+    '</div>';
+
+  if (v.references && v.references.length > 0) {
+    html += '<div style="margin-top:6px;font-size:11px;">' +
+      v.references.map(function(r) {
+        return '<a href="' + escHtml(r.url) + '" target="_blank" rel="noopener" style="color:var(--accent);margin-right:12px;">' + escHtml(r.type || 'Link') + '</a>';
+      }).join('') + '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function toggleFixedVulns(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'flex' : 'none';
+  btn.textContent = isHidden ? 'Ẩn chi tiết' : 'Hiện chi tiết';
 }
 
 // ─── Dependency Tree Loader ───────────────────────────────────────────────────
@@ -1268,6 +1449,7 @@ async function changeProject() {
     });
     const data = await res.json();
     if (data.success) {
+      sourceMode = 'local';
       allPackages = [];
       cveData = {};
       usageData = {};
@@ -1275,6 +1457,7 @@ async function changeProject() {
       document.getElementById('statSubDeps').textContent = '—';
       document.getElementById('statErrors').textContent = '—';
       document.getElementById('statVulns').textContent = '—';
+      document.getElementById('statTotalVulns').textContent = '—';
       document.getElementById('statAffected').textContent = '—';
       document.getElementById('statUnused').textContent = '—';
       document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">' + SVG.package + '</div><h3>Project mới đã được chọn</h3><p>Nhấn Phân tích để bắt đầu</p></div></td></tr>';
@@ -1318,6 +1501,51 @@ function exportCSV() {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeModalDirect();
 });
+
+// ─── Source Mode (Local / GitHub) ─────────────────────────────────────────────
+let sourceMode = 'local'; // 'local' | 'github'
+
+function setSourceMode(mode, el) {
+  sourceMode = mode;
+  document.querySelectorAll('.path-bar .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('localInputWrap').style.display = mode === 'local' ? 'flex' : 'none';
+  document.getElementById('githubInputWrap').style.display = mode === 'github' ? 'flex' : 'none';
+}
+
+async function changeToGithub() {
+  const url = document.getElementById('githubInput').value.trim();
+  if (!url) return showToast('Vui lòng nhập link GitHub', 'error');
+  try {
+    const res = await fetch('/api/set-github', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ githubUrl: url })
+    });
+    const data = await res.json();
+    if (data.success) {
+      allPackages = [];
+      cveData = {};
+      usageData = {};
+      updateStatsCards(0, 0, 0);
+      document.getElementById('statSubDeps').textContent = '—';
+      document.getElementById('statErrors').textContent = '—';
+      document.getElementById('statVulns').textContent = '—';
+      document.getElementById('statTotalVulns').textContent = '—';
+      document.getElementById('statAffected').textContent = '—';
+      document.getElementById('statUnused').textContent = '—';
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">' + SVG.package + '</div><h3>GitHub repo đã được tải</h3><p>Nhấn Phân tích để bắt đầu</p></div></td></tr>';
+      document.getElementById('chartsRow').style.display = 'none';
+      document.getElementById('btnExport').disabled = true;
+      await init();
+      showToast('Đã tải từ GitHub: ' + data.owner + '/' + data.repo + ' (branch: ' + data.branch + ')', 'success');
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Lỗi: ' + e.message, 'error');
+  }
+}
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 init();
