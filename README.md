@@ -50,7 +50,7 @@
 │ [Top Sub-Deps Chart]  [Dep Distribution]  [Top Downloads Chart]    │
 ├────────────────────────────────────────────────────────────────────-┤
 │ Thư viện    │ Version │ Bảo mật      │ Sử dụng │ Phát hành │ ...  │
-│ bcrypt      │ v6.0.0  │ 🟢 ĐÃ FIX   │ —       │ 2011      │ ...  │
+│ bcrypt      │ v6.0.0  │ 🟢 ĐÃ FIX    │ —       │ 2011      │ ...  │
 │ express     │ v5.2.1  │ 🔴 2 ACTIVE  │ —       │ 2010      │ ...  │
 │ helmet      │ v8.1.0  │ 🟢 AN TOÀN   │ —       │ 2012      │ ...  │
 │ jsonwebtoken│ v9.0.3  │ 🟢 ĐÃ FIX   │ —       │ 2013      │ ...  │
@@ -103,7 +103,8 @@ http://localhost:3838
 
 - **Local project**: Nhập đường dẫn thư mục chứa `package.json` → nhấn **Đổi project**
 - **GitHub repo**: Chuyển sang tab **GitHub** → nhập URL repo → nhấn **Tải từ GitHub**
-  - Hỗ trợ: `https://github.com/owner/repo`, `https://github.com/owner/repo/tree/branch`
+  - Hỗ trợ: `https://github.com/owner/repo`, `https://github.com/owner/repo/tree/branch`, `https://github.com/owner/repo/tree/branch/subdir`
+  - Nếu repo có nhiều thư mục (ví dụ `frontend/`, `backend/`), nhấn **Tìm package.json** để tìm tất cả vị trí có `package.json` và chọn thư mục cần phân tích
 - Nhấn nút **Phân tích** để bắt đầu quét
 
 Kết quả sẽ hiển thị:
@@ -118,7 +119,7 @@ Kết quả sẽ hiển thị:
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| `GET` | `/api/project-info` | Thông tin project (name, version, số deps, isGithub) |
+| `GET` | `/api/project-info` | Thông tin project (name, version, số deps, isGithub, branch, subdir) |
 | `GET` | `/api/packages-list` | Danh sách tất cả packages |
 | `GET` | `/api/analyze` | Phân tích đầy đủ tất cả packages |
 | `GET` | `/api/package/:name` | Thông tin chi tiết 1 package |
@@ -128,7 +129,8 @@ Kết quả sẽ hiển thị:
 | `GET` | `/api/usage` | Kiểm tra sử dụng thực tế tất cả packages |
 | `GET` | `/api/usage/:name` | Kiểm tra sử dụng 1 package |
 | `POST` | `/api/set-project` | Đổi project path (`{ "projectPath": "..." }`) |
-| `POST` | `/api/set-github` | Tải từ GitHub repo (`{ "githubUrl": "https://github.com/..." }`) |
+| `POST` | `/api/set-github` | Tải từ GitHub repo (`{ "githubUrl": "...", "subdir": "backend" }`) |
+| `POST` | `/api/github-discover` | Tìm tất cả thư mục chứa package.json trong repo (`{ "githubUrl": "..." }`) |
 
 ---
 
@@ -182,8 +184,17 @@ Phân tích thư viện trực tiếp từ bất kỳ GitHub repo công khai nà
 **Hỗ trợ các định dạng URL:**
 - `https://github.com/owner/repo`
 - `https://github.com/owner/repo/tree/branch-name`
+- `https://github.com/owner/repo/tree/branch-name/subdir/path`
 - `github.com/owner/repo`
 - `https://github.com/owner/repo.git`
+
+**Hỗ trợ monorepo & thư mục con:**
+- Nếu `package.json` nằm trong thư mục con (ví dụ `Backend/`), chỉ định trực tiếp trong URL:
+  - `https://github.com/owner/repo/tree/main/Backend`
+- Nếu repo có nhiều project (ví dụ `frontend/` và `backend/`):
+  1. Nhập URL repo → nhấn nút **Tìm package.json**
+  2. Tool sẽ liệt kê tất cả thư mục chứa `package.json`
+  3. Click vào thư mục cần phân tích
 
 **Hạn chế khi dùng GitHub:**
 - Không quét được usage (import/require) vì không có source code local

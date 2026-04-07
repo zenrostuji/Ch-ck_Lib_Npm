@@ -118,10 +118,11 @@ function readTargetPackageJson(projectPath) {
 }
 
 /**
- * Parse GitHub URL thành { owner, repo, branch }
+ * Parse GitHub URL thành { owner, repo, branch, subdir }
  * Hỗ trợ:
  *   https://github.com/owner/repo
  *   https://github.com/owner/repo/tree/branch
+ *   https://github.com/owner/repo/tree/branch/subdir/path
  *   github.com/owner/repo
  */
 function parseGithubUrl(url) {
@@ -130,31 +131,78 @@ function parseGithubUrl(url) {
   // Thêm https:// nếu thiếu
   if (cleaned.startsWith('github.com')) cleaned = 'https://' + cleaned;
 
-  const match = cleaned.match(
-    /^https?:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?:\/tree\/([^\/?#]+))?/
-  );
-  if (!match) return null;
-  return { owner: match[1], repo: match[2], branch: match[3] || 'main' };
+  try {
+    const urlObj = new URL(cleaned);
+    if (urlObj.hostname !== 'github.com') return null;
+
+    const parts = urlObj.pathname.split('/').filter(Boolean);
+    if (parts.length < 2) return null;
+
+    const owner = parts[0];
+    const repo = parts[1];
+    let branch = 'main';
+    let subdir = '';
+
+    // /tree/branch/optional/subdir/path
+    if (parts[2] === 'tree' && parts.length >= 4) {
+      branch = parts[3];
+      if (parts.length > 4) {
+        subdir = parts.slice(4).join('/');
+      }
+    }
+
+    return { owner, repo, branch, subdir };
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
- * Fetch package.json từ GitHub repo
+ * Fetch package.json từ GitHub repo (hỗ trợ subdir)
  */
-async function fetchGithubPackageJson(owner, repo, branch) {
+async function fetchGithubPackageJson(owner, repo, branch, subdir) {
   // Thử branch được chỉ định, nếu thất bại thử 'master'
   const branches = [branch];
   if (branch === 'main') branches.push('master');
 
+  const prefix = subdir ? subdir + '/' : '';
+
   for (const br of branches) {
     try {
-      const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(br)}/package.json`;
+      const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(br)}/${prefix}package.json`;
       const { data } = await axios.get(rawUrl, { timeout: 15000 });
       return { data, branch: br };
     } catch (err) {
       if (err.response?.status === 404 && br !== branches[branches.length - 1]) continue;
       if (err.response?.status === 404) {
-        throw new Error(`Không tìm thấy package.json trong repo ${owner}/${repo} (đã thử branch: ${branches.join(', ')})`);
+        throw new Error(`Không tìm thấy package.json trong repo ${owner}/${repo}${subdir ? '/' + subdir : ''} (đã thử branch: ${branches.join(', ')})`);
       }
+      throw err;
+    }
+  }
+}
+
+/**
+ * Tìm tất cả package.json trong GitHub repo (dùng GitHub Tree API)
+ */
+async function discoverGithubPackageJsons(owner, repo, branch) {
+  const branches = [branch];
+  if (branch === 'main') branches.push('master');
+
+  for (const br of branches) {
+    try {
+      const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(br)}?recursive=1`;
+      const { data } = await axios.get(treeUrl, { timeout: 20000, headers: { 'Accept': 'application/vnd.github.v3+json' } });
+      const pkgFiles = (data.tree || []).filter(
+        (item) => item.type === 'blob' && item.path.endsWith('/package.json')
+      );
+      // Trả về danh sách thư mục chứa package.json (bỏ root)
+      const subdirs = pkgFiles.map((f) => f.path.replace(/\/package\.json$/, ''));
+      // Kiểm tra có package.json ở root không
+      const hasRoot = (data.tree || []).some((item) => item.type === 'blob' && item.path === 'package.json');
+      return { subdirs, hasRoot, branch: br };
+    } catch (err) {
+      if (err.response?.status === 404 && br !== branches[branches.length - 1]) continue;
       throw err;
     }
   }
@@ -180,6 +228,8 @@ app.get('/api/project-info', (req, res) => {
       totalPeerDeps: Object.keys(pkg.peerDependencies || {}).length,
       isGithub: githubMode,
       githubUrl: githubMode ? `https://github.com/${githubRepoInfo.owner}/${githubRepoInfo.repo}` : null,
+      githubBranch: githubMode ? githubRepoInfo.branch : null,
+      githubSubdir: githubMode ? (githubRepoInfo.subdir || '') : null,
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -283,7 +333,7 @@ app.post('/api/set-project', (req, res) => {
 
 /** Thay đổi sang GitHub repo */
 app.post('/api/set-github', async (req, res) => {
-  const { githubUrl } = req.body;
+  const { githubUrl, subdir: bodySubdir } = req.body;
   if (!githubUrl) return res.status(400).json({ success: false, error: 'Thiếu githubUrl' });
 
   const parsed = parseGithubUrl(githubUrl);
@@ -294,10 +344,19 @@ app.post('/api/set-github', async (req, res) => {
     });
   }
 
+  // Ưu tiên subdir từ body, nếu không thì lấy từ URL
+  const subdir = (bodySubdir != null ? bodySubdir : parsed.subdir) || '';
+
   try {
-    const result = await fetchGithubPackageJson(parsed.owner, parsed.repo, parsed.branch);
+    const result = await fetchGithubPackageJson(parsed.owner, parsed.repo, parsed.branch, subdir);
     githubPackageJson = result.data;
-    githubRepoInfo = { owner: parsed.owner, repo: parsed.repo, branch: result.branch, url: githubUrl };
+    githubRepoInfo = {
+      owner: parsed.owner,
+      repo: parsed.repo,
+      branch: result.branch,
+      subdir: subdir,
+      url: githubUrl,
+    };
     githubMode = true;
     cache.clear();
     cveCache.clear();
@@ -307,7 +366,36 @@ app.post('/api/set-github', async (req, res) => {
       owner: parsed.owner,
       repo: parsed.repo,
       branch: result.branch,
+      subdir: subdir,
       projectName: githubPackageJson.name || parsed.repo,
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+/** Tìm tất cả thư mục chứa package.json trong GitHub repo */
+app.post('/api/github-discover', async (req, res) => {
+  const { githubUrl } = req.body;
+  if (!githubUrl) return res.status(400).json({ success: false, error: 'Thiếu githubUrl' });
+
+  const parsed = parseGithubUrl(githubUrl);
+  if (!parsed) {
+    return res.status(400).json({
+      success: false,
+      error: 'URL GitHub không hợp lệ.',
+    });
+  }
+
+  try {
+    const result = await discoverGithubPackageJsons(parsed.owner, parsed.repo, parsed.branch);
+    res.json({
+      success: true,
+      owner: parsed.owner,
+      repo: parsed.repo,
+      branch: result.branch,
+      hasRoot: result.hasRoot,
+      subdirs: result.subdirs,
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

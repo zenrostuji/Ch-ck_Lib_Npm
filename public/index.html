@@ -540,13 +540,18 @@
       <input type="text" class="path-input" id="pathInput" placeholder="D:\my-project hoặc /home/user/my-project" style="flex:1;" />
       <button class="btn btn-outline" onclick="changeProject()">Đổi project</button>
     </div>
-    <div id="githubInputWrap" style="display:none;align-items:center;gap:12px;flex:1;min-width:0;">
+    <div id="githubInputWrap" style="display:none;align-items:center;gap:12px;flex:1;min-width:0;flex-wrap:wrap;">
       <label style="color:var(--text2);font-size:13px;white-space:nowrap;display:flex;align-items:center;gap:6px;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub URL:
       </label>
-      <input type="text" class="path-input" id="githubInput" placeholder="https://github.com/owner/repo hoặc https://github.com/owner/repo/tree/branch" style="flex:1;" />
+      <input type="text" class="path-input" id="githubInput" placeholder="https://github.com/owner/repo/tree/branch/subdir" style="flex:1;min-width:200px;" />
       <button class="btn btn-outline" onclick="changeToGithub()">Tải từ GitHub</button>
+      <button class="btn btn-outline" onclick="discoverSubdirs()" title="Tìm tất cả thư mục chứa package.json trong repo">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Tìm package.json
+      </button>
+      <div id="subdirSelector" style="display:none;width:100%;margin-top:4px;"></div>
     </div>
   </div>
 
@@ -761,9 +766,11 @@ async function init() {
     const data = await res.json();
     if (data.success) {
       const nameLabel = data.name + ' v' + data.version;
-      document.getElementById('projectName').textContent = data.isGithub
-        ? '🐙 ' + nameLabel
-        : nameLabel;
+      let displayName = data.isGithub ? '🐙 ' + nameLabel : nameLabel;
+      if (data.isGithub && data.githubBranch) {
+        displayName += ' (' + data.githubBranch + (data.githubSubdir ? '/' + data.githubSubdir : '') + ')';
+      }
+      document.getElementById('projectName').textContent = displayName;
       if (data.isGithub) {
         document.getElementById('githubInput').value = data.githubUrl || '';
         // Auto-switch to GitHub tab if in GitHub mode
@@ -1538,7 +1545,94 @@ async function changeToGithub() {
       document.getElementById('chartsRow').style.display = 'none';
       document.getElementById('btnExport').disabled = true;
       await init();
-      showToast('Đã tải từ GitHub: ' + data.owner + '/' + data.repo + ' (branch: ' + data.branch + ')', 'success');
+      let msg = 'Đã tải từ GitHub: ' + data.owner + '/' + data.repo + ' (branch: ' + data.branch;
+      if (data.subdir) msg += ', thư mục: ' + data.subdir;
+      msg += ')';
+      showToast(msg, 'success');
+    } else {
+      showToast(data.error, 'error');
+    }
+  } catch(e) {
+    showToast('Lỗi: ' + e.message, 'error');
+  }
+}
+
+// ─── Discover subdirectories with package.json ────────────────────────────────
+async function discoverSubdirs() {
+  const url = document.getElementById('githubInput').value.trim();
+  if (!url) return showToast('Vui lòng nhập link GitHub trước', 'error');
+
+  const selectorEl = document.getElementById('subdirSelector');
+  selectorEl.style.display = 'block';
+  selectorEl.innerHTML = '<span style="color:var(--text2);font-size:13px;">⏳ Đang tìm package.json trong repo...</span>';
+
+  try {
+    const res = await fetch('/api/github-discover', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ githubUrl: url })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      selectorEl.innerHTML = '<span style="color:var(--danger);font-size:13px;">Lỗi: ' + data.error + '</span>';
+      return;
+    }
+
+    const locations = [];
+    if (data.hasRoot) locations.push({ label: '/ (root)', value: '' });
+    data.subdirs.forEach(s => locations.push({ label: '📁 ' + s, value: s }));
+
+    if (locations.length === 0) {
+      selectorEl.innerHTML = '<span style="color:var(--warning);font-size:13px;">Không tìm thấy package.json nào trong repo</span>';
+      return;
+    }
+
+    let html = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+    html += '<span style="color:var(--text2);font-size:13px;white-space:nowrap;">Tìm thấy ' + locations.length + ' package.json:</span>';
+    locations.forEach(loc => {
+      html += '<button class="btn btn-outline" style="font-size:12px;padding:4px 10px;" onclick="selectSubdir(\'' + loc.value.replace(/'/g, "\\'") + '\')">' + loc.label + '</button>';
+    });
+    html += '<button class="btn btn-outline" style="font-size:12px;padding:4px 8px;opacity:0.6;" onclick="document.getElementById(\'subdirSelector\').style.display=\'none\'">✕</button>';
+    html += '</div>';
+    selectorEl.innerHTML = html;
+  } catch(e) {
+    selectorEl.innerHTML = '<span style="color:var(--danger);font-size:13px;">Lỗi: ' + e.message + '</span>';
+  }
+}
+
+async function selectSubdir(subdir) {
+  const url = document.getElementById('githubInput').value.trim();
+  if (!url) return;
+
+  document.getElementById('subdirSelector').style.display = 'none';
+  showToast('Đang tải package.json từ ' + (subdir || 'root') + '...', 'info');
+
+  try {
+    const res = await fetch('/api/set-github', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ githubUrl: url, subdir: subdir })
+    });
+    const data = await res.json();
+    if (data.success) {
+      allPackages = [];
+      cveData = {};
+      usageData = {};
+      updateStatsCards(0, 0, 0);
+      document.getElementById('statSubDeps').textContent = '—';
+      document.getElementById('statErrors').textContent = '—';
+      document.getElementById('statVulns').textContent = '—';
+      document.getElementById('statTotalVulns').textContent = '—';
+      document.getElementById('statAffected').textContent = '—';
+      document.getElementById('statUnused').textContent = '—';
+      document.getElementById('tableBody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">' + SVG.package + '</div><h3>GitHub repo đã được tải</h3><p>Nhấn Phân tích để bắt đầu</p></div></td></tr>';
+      document.getElementById('chartsRow').style.display = 'none';
+      document.getElementById('btnExport').disabled = true;
+      await init();
+      let msg = 'Đã tải: ' + data.owner + '/' + data.repo + ' (branch: ' + data.branch;
+      if (data.subdir) msg += ', thư mục: ' + data.subdir;
+      msg += ')';
+      showToast(msg, 'success');
     } else {
       showToast(data.error, 'error');
     }
